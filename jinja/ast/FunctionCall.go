@@ -20,10 +20,10 @@ type funcCallArg struct {
 
 var _ AST = &FunctionCall{}
 
-func NewFunctionCall(token *lexer.Token) *FunctionCall {
+func NewFunctionCall(token *lexer.Token, funcName string) *FunctionCall {
 	return &FunctionCall{
 		position:  token.Start,
-		name:      token.Value,
+		name:      funcName,
 		arguments: make([]funcCallArg, 0),
 	}
 }

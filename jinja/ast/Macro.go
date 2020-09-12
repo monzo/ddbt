@@ -36,6 +36,7 @@ func (m *Macro) Position() lexer.Position {
 }
 
 func (m *Macro) Execute(_ *ExecutionContext) AST {
+	// Default param might be None!
 	return nil
 }
 
@@ -52,14 +53,20 @@ func (m *Macro) String() string {
 		if param.defaultValue != nil {
 			builder.WriteString(" = ")
 
-			if param.defaultValue.Type == lexer.StringToken {
+			switch param.defaultValue.Type {
+			case lexer.StringToken:
 				builder.WriteRune('\'')
-			}
-
-			builder.WriteString(param.defaultValue.Value)
-
-			if param.defaultValue.Type == lexer.StringToken {
+				builder.WriteString(param.defaultValue.Value)
 				builder.WriteRune('\'')
+
+			case lexer.NumberToken:
+				builder.WriteString(param.defaultValue.Value)
+
+			case lexer.TrueToken:
+				builder.WriteString("TRUE")
+
+			case lexer.FalseToken:
+				builder.WriteString("FALSE")
 			}
 		}
 	}

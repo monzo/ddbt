@@ -12,13 +12,15 @@ import (
 type parser struct {
 	tokens         []*lexer.Token
 	nextTokenIndex int
+
+	trimFollowingWhitespace bool
 }
 
-func Parse(file *fs.File) error {
+func Parse(file *fs.File) (ast.AST, error) {
 	// TODO: Change tokens into a channel and lex the file async
 	tokens, err := lexer.LexFile(file.Path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	p := &parser{
@@ -30,7 +32,7 @@ func Parse(file *fs.File) error {
 	for {
 		node, err := p.parse()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		body.Append(node)
@@ -40,9 +42,7 @@ func Parse(file *fs.File) error {
 		}
 	}
 
-	fmt.Println(body.String())
-
-	return nil
+	return body, nil
 }
 
 // Returns the next token
@@ -111,28 +111,41 @@ func (p *parser) expectedAndConsumeIdentifier(keyword string) error {
 }
 
 func (p *parser) parse() (ast.AST, error) {
-	t := p.next()
-
-	switch t.Type {
+	switch p.peek().Type {
 	case lexer.EOFToken:
-		return ast.NewEndOfFile(t), nil
+		return ast.NewEndOfFile(p.next()), nil
 
 	case lexer.TextToken:
-		return ast.NewTextBlock(t), nil
+		textToken := ast.NewTextBlock(p.next())
+		if p.trimFollowingWhitespace {
+			result := textToken.TrimPrefixWhitespace()
 
-	case lexer.ExpressionBlockOpen:
+			if result == "" {
+				// Ignore this text block because it's empty!
+				return p.parse()
+			}
+
+			p.trimFollowingWhitespace = false // If here we have non-whitespace characters
+		}
+
+		return textToken, nil
+
+	case lexer.ExpressionBlockOpen, lexer.ExpressionBlockOpenTrim:
 		return p.parseExpressionBlock()
 
 	case lexer.TemplateBlockOpen:
 		return p.parseTemplateBlock()
 
 	default:
+		t := p.next()
 		return nil, p.errorAt(t, "unexpected token: "+t.DisplayString())
 	}
 }
 
 func (p *parser) parseExpressionBlock() (ast.AST, error) {
-	p.consumeIfPossible(lexer.MinusToken) // FIXME: this is meant to strip the whitespace from before this block!
+	if err := p.parseExpressionBlockOpen(); err != nil {
+		return nil, err
+	}
 
 	t, err := p.expectedAndConsumeValue(lexer.IdentToken)
 	if err != nil {
@@ -141,8 +154,11 @@ func (p *parser) parseExpressionBlock() (ast.AST, error) {
 
 	// Assuming that atom expression blocks are always end markers, return early
 	// i.e. {% endmacro %}  or {% endif %} or {% endfor %} or {% else %}
-	if p.peekIs(lexer.ExpressionBlockClose) {
-		_ = p.next() // consume the closing block
+	if p.peekIs(lexer.ExpressionBlockClose) || p.peekIs(lexer.ExpressionBlockCloseTrim) {
+		if err := p.parseExpressionBlockClose(); err != nil {
+			return nil, err
+		}
+
 		return ast.NewAtomExpressionBlock(t), nil
 	}
 
@@ -157,10 +173,32 @@ func (p *parser) parseExpressionBlock() (ast.AST, error) {
 		return p.parseForLoop()
 
 	case "if":
-		return p.parseIfStatement()
+		return p.parseIfStatement(false)
+
+	case "elif":
+		return p.parseIfStatement(true)
+
+	case "call":
+		return p.parseCallBlock()
+
+	case "do":
+		toRun, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := p.parseExpressionBlockClose(); err != nil {
+			return nil, err
+		}
+
+		return ast.NewDoBlock(t, toRun), nil
+
+	case "materialization":
+		// These are unsupported for now
+		return p.parseUnsupportedBlockType(t)
 
 	default:
-		return nil, p.errorAt(t, "Expected `macro` or `set` got "+t.Value)
+		return nil, p.errorAt(t, "Expected `macro`, `set`, `for`, `if`, `call` got "+t.Value)
 	}
 }
 
@@ -192,10 +230,13 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 			_ = p.next()            // consume the =
 			defaultValue = p.next() // get the default
 
-			if defaultValue.Type != lexer.StringToken && defaultValue.Type != lexer.NumberToken {
+			if defaultValue.Type != lexer.StringToken &&
+				defaultValue.Type != lexer.NumberToken &&
+				defaultValue.Type != lexer.TrueToken && defaultValue.Type != lexer.FalseToken &&
+				!(defaultValue.Type == lexer.IdentToken && defaultValue.Value == "None") {
 				return nil, p.errorAt(
 					defaultValue,
-					fmt.Sprintf("Expected string or number, got: %s", defaultValue.Type),
+					fmt.Sprintf("Expected string, number, boolean or `None` - got: %s", defaultValue.Type),
 				)
 			}
 		}
@@ -216,7 +257,7 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 		return nil, err
 	}
 
-	_, err = p.expectedAndConsumeValue(lexer.ExpressionBlockClose)
+	err = p.parseExpressionBlockClose()
 	if err != nil {
 		return nil, err
 	}
@@ -229,52 +270,20 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 }
 
 func (p *parser) parseTemplateBlock() (ast.AST, error) {
+	if _, err := p.expectedAndConsumeValue(lexer.TemplateBlockOpen); err != nil {
+		return nil, err
+	}
+
 	var node ast.AST
 	var err error
 
-	if p.peekIs(lexer.StringToken) {
-		node = ast.NewTextBlock(p.next())
-	} else {
-		ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
-		if err != nil {
-			return nil, err
-		}
-
-		switch {
-		//Variable
-		case p.peekIs(lexer.TemplateBlockClose) ||
-			p.peekIs(lexer.PeriodToken) ||
-			p.peekIs(lexer.LeftBracketToken):
-
-			node, err = p.parseVariable(ident)
-			if err != nil {
-				return nil, err
-			}
-
-		case p.peekIs(lexer.LeftParenthesesToken):
-			node, err = p.parseFunctionCall(ident)
-			if err != nil {
-				return nil, err
-			}
-
-		default:
-			return nil, p.errorAt(ident, "Unable to determine how to process template block")
-		}
+	node, err = p.parseStatement()
+	if err != nil {
+		return nil, err
 	}
 
-	// If this an if statement in the form "x if true"
-	if p.peekIs(lexer.IdentToken) && p.peek().Value == "if" {
-		ifToken := p.next() // consume the if
-
-		condition, err := p.parseCondition()
-		if err != nil {
-			return nil, err
-		}
-
-		is := ast.NewIfStatement(ifToken, condition)
-		is.AppendBody(node)
-
-		node = is
+	if variable, ok := node.(*ast.Variable); ok {
+		variable.SetIsTemplateblock()
 	}
 
 	_, err = p.expectedAndConsumeValue(lexer.TemplateBlockClose)
@@ -285,8 +294,8 @@ func (p *parser) parseTemplateBlock() (ast.AST, error) {
 	return node, nil
 }
 
-func (p *parser) parseFunctionCall(ident *lexer.Token) (ast.AST, error) {
-	funcCall := ast.NewFunctionCall(ident)
+func (p *parser) parseFunctionCall(ident *lexer.Token) (*ast.FunctionCall, error) {
+	funcCall := ast.NewFunctionCall(ident, ident.Value)
 
 	if err := p.parseArgumentList(funcCall); err != nil {
 		return nil, err
@@ -303,53 +312,30 @@ func (p *parser) parseArgumentList(node ast.ArgumentHoldingAST) error {
 
 	// Build the parameter list
 	for !p.peekIs(lexer.RightParenthesesToken) {
-		var variable ast.AST
-
 		namedArg := ""
 
-		if p.peekIs(lexer.StringToken) {
-			variable = ast.NewTextBlock(p.next())
-		} else if p.peekIs(lexer.NumberToken) {
-			variable = ast.NewNumber(p.next())
-		} else {
-			ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
-			if err != nil {
-				return err
-			}
+		firstToken := p.peek()
 
-			// check if we're making a named argument call; i.e.
-			//   foo(bar="hello")
-			if p.peekIs(lexer.EqualsToken) {
-				// Then this is a named parameter call
-				_ = p.next() // consume the =
+		statement, err := p.parseStatement()
+		if err != nil {
+			return err
+		}
 
-				namedArg = ident.Value
+		// Was the statement actually a named parameter?
+		if p.peekIs(lexer.EqualsToken) {
+			if v, ok := statement.(*ast.Variable); ok && v.IsSimpleIdent(firstToken.Value) {
+				namedArg = firstToken.Value
 
-				if p.peekIs(lexer.StringToken) {
-					variable = ast.NewTextBlock(p.next())
-				} else if p.peekIs(lexer.NumberToken) {
-					variable = ast.NewNumber(p.next())
-				} else {
-					variable, err = p.parseVariable(nil)
-					if err != nil {
-						return err
-					}
-				}
-			} else {
-				variable, err = p.parseVariable(ident)
+				_ = p.next() // consume the "="
+
+				statement, err = p.parseStatement()
 				if err != nil {
 					return err
 				}
 			}
 		}
 
-		// Check if the variable has a maths operation
-		variable, err := p.parsePossibleMathsOps(variable)
-		if err != nil {
-			return err
-		}
-
-		node.AddArgument(namedArg, variable)
+		node.AddArgument(namedArg, statement)
 
 		if !p.peekIs(lexer.CommaToken) {
 			break
@@ -365,16 +351,182 @@ func (p *parser) parseArgumentList(node ast.ArgumentHoldingAST) error {
 	return nil
 }
 
-func (p *parser) parsePossibleMathsOps(a ast.AST) (ast.AST, error) {
-	// FIXME: Implement
-	switch p.peek().Type {
-	case lexer.MultiplyToken:
-	case lexer.DivideToken:
-	case lexer.PlusToken:
-	case lexer.MinusToken:
+func (p *parser) parseStatement() (ast.AST, error) {
+	var statement ast.AST
+
+	var err error
+	if p.peekIs(lexer.LeftParenthesesToken) {
+		_ = p.next() // consume the "("
+
+		statement, err = p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.expectedAndConsumeValue(lexer.RightParenthesesToken)
+		if err != nil {
+			return nil, err
+		}
+	} else if p.peekIs(lexer.StringToken) {
+		statement = ast.NewTextBlock(p.next())
+
+	} else if p.peekIs(lexer.NumberToken) {
+		statement = ast.NewNumber(p.next())
+
+	} else if p.peekIs(lexer.TrueToken) || p.peekIs(lexer.FalseToken) {
+		statement = ast.NewBoolValue(p.next())
+
+	} else if p.peekIs(lexer.MinusToken) {
+		op := p.next()
+
+		subStatement, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		statement = ast.NewUniaryMathsOp(op, subStatement)
+
+	} else if p.peekIs(lexer.LeftBracketToken) {
+		statement, err = p.parseList()
+		if err != nil {
+			return nil, err
+		}
+
+	} else if p.peekIs(lexer.LeftBraceToken) {
+		statement, err = p.parseMap()
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		statement, err = p.parseVariable(nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return a, nil
+	// Check if the variable has a maths operation
+	statement, err = p.parsePossibleMathsOps(statement)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for filters
+	for p.peekIs(lexer.PipeToken) {
+		pipeToken := p.next() // consume the "|"
+
+		ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+		if err != nil {
+			return nil, err
+		}
+
+		fc := ast.NewFunctionCall(pipeToken, ident.Value)
+		fc.AddArgument("", statement)
+
+		if p.peekIs(lexer.LeftParenthesesToken) {
+			if err := p.parseArgumentList(fc); err != nil {
+				return nil, err
+			}
+		}
+
+		statement = fc
+	}
+
+	for p.peekIs(lexer.TildeToken) {
+		tildeToken := p.next() // consume the "~"
+
+		rhs, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		statement = ast.NewStringConcat(tildeToken, statement, rhs)
+	}
+
+	// Do we have a suffix if op
+	// i.e. `"foo" if bar else "baz"`
+	if p.peekIs(lexer.IdentToken) && p.peek().Value == "if" {
+		ifToken := p.next() // consume the "if'
+
+		condition, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
+
+		ifs := ast.NewIfStatement(ifToken, condition)
+		ifs.AppendBody(statement)
+
+		if p.peekIs(lexer.IdentToken) && p.peek().Value == "else" {
+			if err := p.expectedAndConsumeIdentifier("else"); err != nil {
+				return nil, err
+			}
+
+			elseValue, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+
+			ifs.AppendElse(elseValue)
+		}
+
+		statement = ifs
+	}
+
+	// Does the statement get turned into a condition?
+	if p.peekIs(lexer.IsEqualsToken) || p.peekIs(lexer.NotEqualsToken) ||
+		p.peekIs(lexer.LessThanToken) || p.peekIs(lexer.LessThanEqualsToken) ||
+		p.peekIs(lexer.GreaterThanToken) || p.peekIs(lexer.GreaterThanEqualsToken) {
+		opToken := p.next() // consume the operator token
+
+		otherSide, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		statement = ast.NewLogicalOp(opToken, statement, otherSide)
+
+		// Check if we and it or not
+		if p.peekIs(lexer.IdentToken) && p.peek().Value == "and" {
+			_ = p.next() // consume and
+
+			otherSide, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+
+			statement = ast.NewAndCondition(statement, otherSide)
+		}
+
+		if p.peekIs(lexer.IdentToken) && p.peek().Value == "or" {
+			_ = p.next() // consume or
+
+			otherSide, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+
+			statement = ast.NewOrCondition(statement, otherSide)
+		}
+
+	}
+
+	return statement, nil
+}
+
+func (p *parser) parsePossibleMathsOps(lhs ast.AST) (ast.AST, error) {
+	switch p.peek().Type {
+	case lexer.MultiplyToken, lexer.DivideToken, lexer.PlusToken, lexer.MinusToken:
+		op := p.next()
+
+		rhs, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.NewMathsOp(op, lhs, rhs), nil
+	}
+
+	return lhs, nil
 }
 
 func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
@@ -390,43 +542,47 @@ func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
 
 	variable := ast.NewVariable(ident)
 
-	// Is this a reference into the variable? (i.e. `a.b`)
-	if p.peekIs(lexer.PeriodToken) {
-		_ = p.next() // consume the `.`
+	for {
+		switch p.peek().Type {
+		case lexer.LeftParenthesesToken:
+			// This variable is being treated like a function call (`a(b)`)
+			variable = variable.AsCallable()
 
-		subvar, err := p.parseVariable(nil)
-		if err != nil {
-			return nil, err
-		}
+			if err := p.parseArgumentList(variable); err != nil {
+				return nil, err
+			}
 
-		variable.SetSub(subvar)
+		case lexer.LeftBracketToken:
+			_ = p.next() // consume "["
 
-	} else if p.peekIs(lexer.LeftBracketToken) {
-		// Otherwise is this a map lookup? (i.e. `a["b"]`)
-		_ = p.next() // consume the [
+			// This variable is being accesed like a map (`a["b"]`)
+			key, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
 
-		str, err := p.expectedAndConsumeValue(lexer.StringToken)
-		if err != nil {
-			return nil, err
-		}
+			if _, err := p.expectedAndConsumeValue(lexer.RightBracketToken); err != nil {
+				return nil, err
+			}
 
-		subvar := ast.NewVariable(str)
-		variable.SetMapLookup(subvar)
+			variable = variable.AsMapLookupTo(key)
 
-		_, err = p.expectedAndConsumeValue(lexer.RightBracketToken)
-		if err != nil {
-			return nil, err
-		}
-	} else if p.peekIs(lexer.LeftParenthesesToken) {
-		// This variable is being treated like a function call!
+		case lexer.PeriodToken:
+			_ = p.next() // consume "."
 
-		variable.IsCalledAsFunc()
-		if err := p.parseArgumentList(variable); err != nil {
-			return nil, err
+			// This variable is being accesed like a object (`a.b`)
+			ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+			if err != nil {
+				return nil, err
+			}
+
+			variable = variable.AsIndexTo(ident)
+
+		default:
+			// We've parsed the varaible completely now
+			return variable, nil
 		}
 	}
-
-	return variable, nil
 }
 
 func (p *parser) parseForLoop() (ast.AST, error) {
@@ -444,9 +600,7 @@ func (p *parser) parseForLoop() (ast.AST, error) {
 		return nil, err
 	}
 
-	p.consumeIfPossible(lexer.MinusToken) // FIXME: this should strip whitespace after
-
-	_, err = p.expectedAndConsumeValue(lexer.ExpressionBlockClose)
+	err = p.parseExpressionBlockClose()
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +631,34 @@ func (p *parser) parseBodyUntilAtom(endAtom string, parentNode ast.BodyHoldingAS
 	return nil
 }
 
-func (p *parser) parseIfStatement() (ast.AST, error) {
+func (p *parser) parseExpressionBlockOpen() error {
+	if p.peekIs(lexer.ExpressionBlockOpenTrim) {
+		// FIXME: trim previous whitespace
+		_ = p.next()
+	} else {
+		_, err := p.expectedAndConsumeValue(lexer.ExpressionBlockOpen)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+func (p *parser) parseExpressionBlockClose() error {
+	if p.peekIs(lexer.ExpressionBlockCloseTrim) {
+		_ = p.next()
+		p.trimFollowingWhitespace = true
+	} else {
+		_, err := p.expectedAndConsumeValue(lexer.ExpressionBlockClose)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *parser) parseIfStatement(asElseIf bool) (ast.AST, error) {
 	conditionToken := p.peek()
 
 	condition, err := p.parseCondition()
@@ -487,13 +668,36 @@ func (p *parser) parseIfStatement() (ast.AST, error) {
 
 	is := ast.NewIfStatement(conditionToken, condition)
 
-	_, err = p.expectedAndConsumeValue(lexer.ExpressionBlockClose)
-	if err != nil {
+	if err := p.parseExpressionBlockClose(); err != nil {
 		return nil, err
 	}
 
-	if err := p.parseBodyUntilAtom("endif", is); err != nil {
-		return nil, err
+	inElse := false
+
+	for {
+		node, err := p.parse()
+		if err != nil {
+			return nil, err
+		}
+
+		if isAtomOrEOF("endif", node) {
+			break
+		} else if isAtomOrEOF("else", node) {
+			inElse = true
+		} else if elif, ok := node.(*ast.IfStatement); ok && elif.IsElseIf() {
+			is.AppendElse(elif)
+			break
+		} else {
+			if inElse {
+				is.AppendElse(node)
+			} else {
+				is.AppendBody(node)
+			}
+		}
+	}
+
+	if asElseIf {
+		is.SetAsElseIf()
 	}
 
 	return is, nil
@@ -503,10 +707,7 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	var condition ast.AST
 	var err error
 
-	if p.peekIs(lexer.StringToken) {
-		condition = ast.NewTextBlock(p.next())
-
-	} else if p.peekIs(lexer.LeftParenthesesToken) {
+	if p.peekIs(lexer.LeftParenthesesToken) {
 		_ = p.next() // consume the (
 
 		// recursive without the the brackets
@@ -519,44 +720,58 @@ func (p *parser) parseCondition() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+		notToken := p.next()
+
+		sub, err := p.parseCondition()
 		if err != nil {
 			return nil, err
 		}
 
-		switch {
-		case ident.Value == "not": // prefix operator
-			sub, err := p.parseCondition()
-			if err != nil {
-				return nil, err
-			}
-
-			condition = ast.NewNotOperator(ident, sub)
-
-		case p.peekIs(lexer.LeftParenthesesToken): // function call
-			condition, err = p.parseFunctionCall(ident)
-			if err != nil {
-				return nil, err
-			}
-
-		default:
-			condition, err = p.parseVariable(ident)
-			if err != nil {
-				return nil, err
-			}
+		condition = ast.NewNotOperator(notToken, sub)
+	} else {
+		condition, err = p.parseStatement()
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	if p.peekIs(lexer.IsEqualsToken) {
-		_ = p.next() // consume ==
+	if p.peekIs(lexer.IsEqualsToken) || p.peekIs(lexer.NotEqualsToken) ||
+		p.peekIs(lexer.LessThanToken) || p.peekIs(lexer.LessThanEqualsToken) ||
+		p.peekIs(lexer.GreaterThanToken) || p.peekIs(lexer.GreaterThanEqualsToken) {
+		opToken := p.next() // consume the operator token
 
 		otherSide, err := p.parseCondition()
 		if err != nil {
 			return nil, err
 		}
 
-		condition = ast.NewEqualsCondition(condition, otherSide)
+		condition = ast.NewLogicalOp(opToken, condition, otherSide)
+	}
+
+	if p.peekIs(lexer.IdentToken) && p.peek().Value == "is" {
+		isToken := p.next() // consume the "is"
+
+		ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+		if err != nil {
+			return nil, err
+		}
+
+		if ident.Value == "not" {
+			ident, err = p.expectedAndConsumeValue(lexer.IdentToken)
+			if err != nil {
+				return nil, err
+			}
+			ident.Value = "not " + ident.Value
+		}
+
+		switch ident.Value {
+		case "none", "defined", "not none", "not defined":
+			condition = ast.NewDefineCheck(isToken, condition, ident.Value)
+		default:
+			return nil, p.errorAt(ident, fmt.Sprintf("Expected `none` or `defined` got `%s`", ident.Value))
+		}
+
 	}
 
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "and" {
@@ -578,7 +793,7 @@ func (p *parser) parseCondition() (ast.AST, error) {
 			return nil, err
 		}
 
-		condition = ast.NewAndCondition(condition, otherSide)
+		condition = ast.NewOrCondition(condition, otherSide)
 	}
 
 	return condition, nil
@@ -600,12 +815,131 @@ func (p *parser) parseSetCall() (ast.AST, error) {
 		return nil, err
 	}
 
-	_, err = p.expectedAndConsumeValue(lexer.ExpressionBlockClose)
+	err = p.parseExpressionBlockClose()
 	if err != nil {
 		return nil, err
 	}
 
 	return ast.NewSetCall(ident, condition), nil
+}
+
+func (p *parser) parseList() (ast.AST, error) {
+	token, err := p.expectedAndConsumeValue(lexer.LeftBracketToken)
+	if err != nil {
+		return nil, err
+	}
+	list := ast.NewList(token)
+
+	for !p.peekIs(lexer.RightBracketToken) {
+		item, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		list.Append(item)
+
+		if !p.peekIs(lexer.CommaToken) {
+			break
+		}
+
+		_, err = p.expectedAndConsumeValue(lexer.CommaToken)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = p.expectedAndConsumeValue(lexer.RightBracketToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+func (p *parser) parseCallBlock() (ast.AST, error) {
+	ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+	if err != nil {
+		return nil, err
+	}
+
+	ifs, err := p.parseFunctionCall(ident)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.parseExpressionBlockClose(); err != nil {
+		return nil, err
+	}
+
+	cb := ast.NewCallBlock(ident, ifs)
+
+	if err := p.parseBodyUntilAtom("endcall", cb); err != nil {
+		return nil, err
+	}
+
+	return cb, nil
+}
+
+func (p *parser) parseUnsupportedBlockType(token *lexer.Token) (ast.AST, error) {
+	block := ast.NewUnsupportedExpressionBlock(token)
+	end := "end" + token.Value
+
+	token = p.next()
+	for token.Type != lexer.EOFToken {
+		token = p.next()
+
+		if (token.Type == lexer.ExpressionBlockOpen || token.Type == lexer.ExpressionBlockOpenTrim) &&
+			p.peekIs(lexer.IdentToken) && p.peek().Value == end {
+			_ = p.next() // consume
+
+			err := p.parseExpressionBlockClose()
+			if err != nil {
+				return nil, err
+			}
+
+			return block, nil
+		}
+	}
+
+	return block, nil
+}
+
+func (p *parser) parseMap() (ast.AST, error) {
+	openingToken, err := p.expectedAndConsumeValue(lexer.LeftBraceToken)
+	if err != nil {
+		return nil, err
+	}
+	m := ast.NewMap(openingToken)
+
+	for !p.peekIs(lexer.RightBraceToken) {
+		key, err := p.expectedAndConsumeValue(lexer.StringToken)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.expectedAndConsumeValue(lexer.ColonToken)
+		if err != nil {
+			return nil, err
+		}
+
+		value := p.next()
+		if value.Type != lexer.StringToken && value.Type != lexer.NumberToken && value.Type != lexer.NullToken {
+			return nil, p.errorAt(value, "Expected string, number or null")
+		}
+
+		m.Put(key, value)
+
+		if !p.peekIs(lexer.CommaToken) {
+			break
+		}
+		_ = p.next()
+	}
+
+	if _, err := p.expectedAndConsumeValue(lexer.RightBraceToken); err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 func isAtomOrEOF(expectedAtom string, node ast.AST) bool {

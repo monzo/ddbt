@@ -1,6 +1,11 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"strings"
+	"unicode"
+
+	"ddbt/jinja/lexer"
+)
 
 // A block which represents a simple
 type TextBlock struct {
@@ -26,5 +31,11 @@ func (tb *TextBlock) Execute(_ *ExecutionContext) AST {
 }
 
 func (tb *TextBlock) String() string {
+	return tb.value
+}
+
+func (tb *TextBlock) TrimPrefixWhitespace() string {
+	tb.value = strings.TrimLeftFunc(tb.value, unicode.IsSpace)
+
 	return tb.value
 }

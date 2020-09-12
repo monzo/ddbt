@@ -14,26 +14,32 @@ func main() {
 		log.Fatalf("Unable to read filesystem: %s", err)
 	}
 
-	macro := fileSystem.Macro("test_x_pct_not_null_in_last_num_days")
-	if err := jinja.Parse(macro); err != nil {
-		log.Fatalf("Unable to parse %s: %s", macro.Name, err)
-	}
+	//model := fileSystem.Model("")
+	//if model != nil {
+	//	fmt.Printf("Processing %s\n", model.Name)
+	//
+	//	body, err := jinja.Parse(model)
+	//	if err != nil {
+	//		log.Fatalf("Unable to parse model %s : %s", model.Name, err)
+	//	}
+	//
+	//	fmt.Println(body)
+	//}
 
 	for _, macro := range fileSystem.Macros() {
 		fmt.Printf("Processing %s\n", macro.Name)
 
-		if err := jinja.Parse(macro); err != nil {
-			log.Fatalf("Unable to parse %s: %s", macro.Name, err)
+		_, err := jinja.Parse(macro)
+		if err != nil {
+			log.Fatalf("Unable to parse macro %s : %s", macro.Name, err)
 		}
 	}
 
-	//for _, model := range fileSystem.Models() {
-	//	fmt.Printf("Processing %s\n", model.Name)
-	//
-	//	if _, err := jinja.LexFile(model.Path); err != nil {
-	//		log.Fatalf("Unable to lex %s: %s", model.Name, err)
-	//	}
-	//
-	//	return
-	//}
+	for _, model := range fileSystem.Models() {
+		fmt.Printf("Processing %s\n", model.Name)
+
+		if _, err := jinja.Parse(model); err != nil {
+			log.Fatalf("Unable to parse model %s : %s", model.Name, err)
+		}
+	}
 }

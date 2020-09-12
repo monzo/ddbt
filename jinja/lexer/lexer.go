@@ -10,6 +10,8 @@ import (
 	"unicode"
 )
 
+const tabSize = 4
+
 type lexer struct {
 	reader *bufio.Reader
 
@@ -87,6 +89,8 @@ func (l *lexer) readRune() error {
 		// the next rune is in column 1 of the next row
 		l.runePosition.Column = 1
 		l.runePosition.Row++
+	} else if l.currentRune == '\t' {
+		l.runePosition.Column += tabSize
 	} else {
 		l.runePosition.Column++
 	}
@@ -160,8 +164,41 @@ func (l *lexer) nextTextModeToken() (*Token, error) {
 			return nil, err
 		}
 
+		// Detect a trim prefix command `{%-`
+		if l.nextRune == '-' {
+			if err := l.readRune(); err != nil {
+				return nil, err
+			}
+			return l.newToken(ExpressionBlockOpenTrim), nil
+		}
+
 		// Return a Block Open Token
 		return l.newToken(ExpressionBlockOpen), nil
+	}
+
+	// Comment block support
+	if l.currentRune == '{' &&
+		l.nextRune == '#' {
+
+		// Consume the # and the move onto the following character
+		// This is so we don't parse {#} as {##}
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+
+		for !(l.currentRune == '#' && l.nextRune == '}') {
+			if err := l.readRune(); err != nil {
+				return nil, err
+			}
+		}
+
+		// Consume the closing '}'
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Read the rest of the string block
@@ -208,6 +245,21 @@ func (l *lexer) nextBlockToken() (*Token, error) {
 
 		return l.newToken(ExpressionBlockClose), nil
 
+	case l.currentRune == '-' && l.nextRune == '%':
+		// consume the next Token too
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+
+		if l.nextRune != '}' {
+			return l.newTokenWithValue(ErrorToken, fmt.Sprintf("Expected } got %s", string(l.nextRune))), errors.New("unexpected char")
+		}
+
+		// Mark us as leaving a code block
+		l.inBlock = false
+
+		return l.newToken(ExpressionBlockCloseTrim), nil
+
 	case l.currentRune == '(':
 		return l.newToken(LeftParenthesesToken), nil
 
@@ -240,6 +292,24 @@ func (l *lexer) nextBlockToken() (*Token, error) {
 			return nil, err
 		}
 		return l.newToken(NotEqualsToken), nil
+
+	case l.currentRune == '<' && l.nextRune == '=':
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+		return l.newToken(LessThanEqualsToken), nil
+
+	case l.currentRune == '<':
+		return l.newToken(LessThanToken), nil
+
+	case l.currentRune == '>' && l.nextRune == '=':
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+		return l.newToken(GreaterThanEqualsToken), nil
+
+	case l.currentRune == '>':
+		return l.newToken(GreaterThanToken), nil
 
 	case l.currentRune == ':':
 		return l.newToken(ColonToken), nil
@@ -353,12 +423,12 @@ func (l *lexer) readMultilineStringToken() (*Token, error) {
 		if l.currentRune == '\'' || l.currentRune == 0 {
 			exitCount++
 
-			if err := l.readRune(); err != nil {
-				return nil, err
-			}
-
 			if exitCount == 3 {
 				break
+			}
+
+			if err := l.readRune(); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -400,8 +470,20 @@ func (l *lexer) readIdentifierToken() (*Token, error) {
 
 	// Write the last character of the ident in
 	buf.WriteRune(l.currentRune)
+	value := buf.String()
 
-	return l.newTokenWithValue(IdentToken, buf.String()), nil
+	// Keyword replacement
+	switch strings.ToLower(value) {
+	case "true":
+		return l.newToken(TrueToken), nil
+	case "false":
+		return l.newToken(FalseToken), nil
+	case "null":
+		return l.newToken(NullToken), nil
+
+	default:
+		return l.newTokenWithValue(IdentToken, value), nil
+	}
 }
 
 func isIdentRune(r rune) bool {
