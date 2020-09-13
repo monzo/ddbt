@@ -1,6 +1,9 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+	"ddbt/jinja/lexer"
+)
 
 type UnsupportedExpressionBlock struct {
 	position lexer.Position
@@ -18,8 +21,8 @@ func (b *UnsupportedExpressionBlock) Position() lexer.Position {
 	return b.position
 }
 
-func (b *UnsupportedExpressionBlock) Execute(_ *ExecutionContext) AST {
-	return nil
+func (b *UnsupportedExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (b *UnsupportedExpressionBlock) String() string {

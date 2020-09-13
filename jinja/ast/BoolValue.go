@@ -1,6 +1,9 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+	"ddbt/jinja/lexer"
+)
 
 type BoolValue struct {
 	position lexer.Position
@@ -20,8 +23,8 @@ func (b *BoolValue) Position() lexer.Position {
 	return b.position
 }
 
-func (b *BoolValue) Execute(_ *ExecutionContext) AST {
-	return nil
+func (b *BoolValue) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (b *BoolValue) String() string {

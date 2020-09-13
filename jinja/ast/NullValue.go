@@ -1,6 +1,9 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+	"ddbt/jinja/lexer"
+)
 
 type NullValue struct {
 	position lexer.Position
@@ -18,10 +21,10 @@ func (n *NullValue) Position() lexer.Position {
 	return n.position
 }
 
-func (n *NullValue) Execute(_ *ExecutionContext) AST {
-	return nil
+func (n *NullValue) Execute(_ compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return newTextBlockAt(n.position, ""), nil
 }
 
 func (n *NullValue) String() string {
-	return ""
+	return "null"
 }

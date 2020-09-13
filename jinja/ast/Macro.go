@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -35,9 +36,9 @@ func (m *Macro) Position() lexer.Position {
 	return m.position
 }
 
-func (m *Macro) Execute(_ *ExecutionContext) AST {
+func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
 	// Default param might be None!
-	return nil
+	return nil, nil
 }
 
 func (m *Macro) String() string {

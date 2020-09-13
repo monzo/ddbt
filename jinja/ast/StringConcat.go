@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -26,8 +27,8 @@ func (sc *StringConcat) Position() lexer.Position {
 	return sc.position
 }
 
-func (sc *StringConcat) Execute(_ *ExecutionContext) AST {
-	return nil
+func (sc *StringConcat) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (sc *StringConcat) String() string {

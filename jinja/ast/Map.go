@@ -1,6 +1,9 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+	"ddbt/jinja/lexer"
+)
 
 type Map struct {
 	position lexer.Position
@@ -20,8 +23,8 @@ func (m *Map) Position() lexer.Position {
 	return m.position
 }
 
-func (m *Map) Execute(_ *ExecutionContext) AST {
-	return nil
+func (m *Map) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (m *Map) String() string {

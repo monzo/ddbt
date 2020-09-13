@@ -34,6 +34,29 @@ func ReadFileSystem() (*FileSystem, error) {
 	return fs, nil
 }
 
+// Create a test file system with mock files
+func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
+	fs := &FileSystem{
+		files:       make([]*File, 0),
+		macroLookup: make(map[string]*File),
+		modelLookup: make(map[string]*File),
+	}
+
+	for filePath, contents := range models {
+
+		file := newFile(filePath, nil, ModelFile)
+		file.PrereadFileContents = contents
+
+		fs.files = append(fs.files, file)
+
+		if err := fs.mapModelLookupOptions(file); err != nil {
+			return nil, err
+		}
+	}
+
+	return fs, nil
+}
+
 func (fs *FileSystem) scanDirectory(path string, fileType FileType) error {
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		// If we've encountered an error walking this path, let's return now

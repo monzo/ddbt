@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -24,8 +25,8 @@ func (n *NotOperator) Position() lexer.Position {
 	return n.position
 }
 
-func (n *NotOperator) Execute(_ *ExecutionContext) AST {
-	return nil
+func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (n *NotOperator) String() string {

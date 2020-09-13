@@ -1,6 +1,9 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+	"ddbt/jinja/lexer"
+)
 
 // A block which represents a simple
 type EndOfFile struct {
@@ -19,8 +22,8 @@ func (eof *EndOfFile) Position() lexer.Position {
 	return eof.position
 }
 
-func (eof *EndOfFile) Execute(_ *ExecutionContext) AST {
-	return nil
+func (eof *EndOfFile) Execute(_ compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return newTextBlockAt(eof.position, ""), nil
 }
 
 func (eof *EndOfFile) String() string {

@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -23,8 +24,8 @@ func (a *AtomExpressionBlock) Position() lexer.Position {
 	return a.token.Start
 }
 
-func (a *AtomExpressionBlock) Execute(_ *ExecutionContext) AST {
-	return nil
+func (a *AtomExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (a *AtomExpressionBlock) String() string {

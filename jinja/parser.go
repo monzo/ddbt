@@ -3,6 +3,9 @@ package jinja
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"ddbt/fs"
 	"ddbt/jinja/ast"
@@ -17,8 +20,21 @@ type parser struct {
 }
 
 func Parse(file *fs.File) (ast.AST, error) {
+	var reader io.Reader
+
+	if file.PrereadFileContents != "" {
+		reader = strings.NewReader(file.PrereadFileContents)
+	} else {
+		f, err := os.Open(file.Path)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = f.Close() }()
+		reader = f
+	}
+
 	// TODO: Change tokens into a channel and lex the file async
-	tokens, err := lexer.LexFile(file.Path)
+	tokens, err := lexer.LexFile(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +574,7 @@ func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
 		case lexer.LeftBracketToken:
 			_ = p.next() // consume "["
 
-			// This variable is being accesed like a map (`a["b"]`)
+			// This variable is being accesed like a map or array (`a["b"]`)
 			key, err := p.parseStatement()
 			if err != nil {
 				return nil, err
@@ -568,7 +584,7 @@ func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
 				return nil, err
 			}
 
-			variable = variable.AsMapLookupTo(key)
+			variable = variable.AsIndexLookup(key)
 
 		case lexer.PeriodToken:
 			_ = p.next() // consume "."
@@ -579,7 +595,7 @@ func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
 				return nil, err
 			}
 
-			variable = variable.AsIndexTo(ident)
+			variable = variable.AsPropertyLookup(ident)
 
 		default:
 			// We've parsed the varaible completely now

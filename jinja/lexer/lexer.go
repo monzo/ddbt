@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"unicode"
 )
@@ -27,13 +26,7 @@ type lexer struct {
 	inBlock bool
 }
 
-func LexFile(path string) ([]*Token, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = file.Close() }()
-
+func LexFile(file io.Reader) ([]*Token, error) {
 	lexer := &lexer{
 		reader:       bufio.NewReader(file),
 		runePosition: Position{0, 1},
@@ -195,10 +188,17 @@ func (l *lexer) nextTextModeToken() (*Token, error) {
 			}
 		}
 
-		// Consume the closing '}'
+		// Consume the closing '#}'
 		if err := l.readRune(); err != nil {
 			return nil, err
 		}
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+	}
+
+	if l.currentRune == 0 {
+		return l.newToken(EOFToken), nil
 	}
 
 	// Read the rest of the string block

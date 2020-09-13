@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -27,8 +28,8 @@ func (is *IfStatement) Position() lexer.Position {
 	return is.condition.Position()
 }
 
-func (is *IfStatement) Execute(_ *ExecutionContext) AST {
-	return nil
+func (is *IfStatement) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (is *IfStatement) String() string {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -25,8 +26,8 @@ func (l *List) Position() lexer.Position {
 	return l.position
 }
 
-func (l *List) Execute(_ *ExecutionContext) AST {
-	return nil
+func (l *List) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return nil, nil
 }
 
 func (l *List) String() string {

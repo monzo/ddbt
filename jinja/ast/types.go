@@ -1,12 +1,10 @@
 package ast
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/compilerInterface"
+)
 
-type AST interface {
-	Position() lexer.Position
-	Execute(ec *ExecutionContext) AST
-	String() string
-}
+type AST compilerInterface.AST
 
 type BodyHoldingAST interface {
 	AST

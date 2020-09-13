@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -24,8 +25,8 @@ func (n *Number) Position() lexer.Position {
 	return n.position
 }
 
-func (n *Number) Execute(_ *ExecutionContext) AST {
-	return nil
+func (n *Number) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return newTextBlockAt(n.position, n.value), nil
 }
 
 func (n *Number) String() string {

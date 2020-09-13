@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -36,9 +37,9 @@ func (fl *ForLoop) Position() lexer.Position {
 	return fl.position
 }
 
-func (fl *ForLoop) Execute(_ *ExecutionContext) AST {
+func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
 	// TODO add a map variable called "loop" with a "last" bool param
-	return nil
+	return nil, nil
 }
 
 func (fl *ForLoop) String() string {

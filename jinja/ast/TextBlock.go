@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
 )
 
@@ -22,12 +23,19 @@ func NewTextBlock(token *lexer.Token) *TextBlock {
 	}
 }
 
+func newTextBlockAt(position lexer.Position, text string) *TextBlock {
+	return &TextBlock{
+		position: position,
+		value:    text,
+	}
+}
+
 func (tb *TextBlock) Position() lexer.Position {
 	return tb.position
 }
 
-func (tb *TextBlock) Execute(_ *ExecutionContext) AST {
-	return nil
+func (tb *TextBlock) Execute(_ compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+	return tb, nil // no-op text blocks don't compile to anything apart from themselves
 }
 
 func (tb *TextBlock) String() string {
