@@ -14,6 +14,7 @@ type DoBlock struct {
 
 var _ AST = &DoBlock{}
 
+// A do block executes the code but returns nothing
 func NewDoBlock(token *lexer.Token, run AST) *DoBlock {
 	return &DoBlock{
 		position: token.Start,
@@ -26,7 +27,12 @@ func (d *DoBlock) Position() lexer.Position {
 }
 
 func (d *DoBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	_, err := d.run.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &compilerInterface.Value{IsUndefined: true}, nil
 }
 
 func (d *DoBlock) String() string {

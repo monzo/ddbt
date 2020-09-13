@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,10 +11,11 @@ import (
 
 // A block which represents a simple
 type Macro struct {
-	position   lexer.Position
-	name       string
-	body       *Body
-	parameters []macroParameter
+	position          lexer.Position
+	name              string
+	body              *Body
+	parameters        []macroParameter
+	numOptionalParams int
 }
 
 type macroParameter struct {
@@ -37,8 +39,59 @@ func (m *Macro) Position() lexer.Position {
 }
 
 func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	// Default param might be None!
-	return nil, nil
+	ec.SetVariable(
+		m.name,
+		compilerInterface.NewFunction(func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+			if len(args) < len(m.parameters)-m.numOptionalParams {
+				return nil, ec.ErrorAt(caller, fmt.Sprintf("%d args required, got %d", len(m.parameters)-m.numOptionalParams, len(args)))
+			}
+
+			// quick lookup map
+			namedArgs := make(map[string]*compilerInterface.Value)
+			for _, arg := range args {
+				if arg.Name != "" {
+					namedArgs[arg.Name] = arg.Value
+				}
+			}
+
+			stillOrdered := true
+
+			// Process all the parameters, checking what args where provided
+			for i, param := range m.parameters {
+				if param.defaultValue == nil {
+					arg := args[i]
+
+					// Required paramters have to be given in the correct order
+					if arg.Name != "" && param.name != arg.Name {
+						return nil, ec.ErrorAt(caller, fmt.Sprintf("%s is a required parameter, was given %s", param.name, arg.Name))
+					}
+
+					ec.SetVariable(param.name, arg.Value)
+				} else {
+					if stillOrdered && i < len(args) && (args[i].Name == "" || args[i].Name == param.name) {
+						ec.SetVariable(param.name, args[i].Value)
+					} else {
+						stillOrdered = false
+
+						if setAs, found := namedArgs[param.name]; found {
+							ec.SetVariable(param.name, setAs)
+						} else {
+							value, err := compilerInterface.ValueFromToken(param.defaultValue)
+							if err != nil {
+								return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
+							}
+
+							ec.SetVariable(param.name, value)
+						}
+					}
+				}
+			}
+
+			return m.body.Execute(ec)
+		}),
+	)
+
+	return &compilerInterface.Value{IsUndefined: true}, nil
 }
 
 func (m *Macro) String() string {
@@ -75,11 +128,19 @@ func (m *Macro) String() string {
 	return fmt.Sprintf("\n{%% macro %s(%s) %%}%s{%% endmacro %%}", m.name, builder.String(), m.body.String())
 }
 
-func (m *Macro) AddParameter(name string, defaultValue *lexer.Token) {
+func (m *Macro) AddParameter(name string, defaultValue *lexer.Token) error {
+	if defaultValue != nil {
+		m.numOptionalParams++
+	} else if m.numOptionalParams > 0 {
+		return errors.New("can not have non-operation parameter after an optional one")
+	}
+
 	m.parameters = append(
 		m.parameters,
 		macroParameter{name, defaultValue},
 	)
+
+	return nil
 }
 
 func (m *Macro) AppendBody(node AST) {

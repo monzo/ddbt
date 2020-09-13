@@ -36,7 +36,32 @@ func (fc *FunctionCall) Position() lexer.Position {
 }
 
 func (fc *FunctionCall) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	args, err := fc.arguments.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	function := ec.GetVariable(fc.name)
+	if function.IsUndefined {
+		return nil, ec.ErrorAt(fc, fmt.Sprintf("function `%s` not found", fc.name))
+	}
+
+	if function.Type() != compilerInterface.FunctionalVal {
+		return nil, ec.ErrorAt(fc, fmt.Sprintf("expected `%s` to be a function, got %s", fc.name, function.Type()))
+	}
+
+	if function.Function == nil {
+		return nil, ec.ErrorAt(fc, "function is nil!")
+	}
+
+	ec.PushState()
+	result, err := function.Function(ec, fc, args)
+	if err != nil {
+		return nil, err
+	}
+	ec.PopState()
+
+	return result, err
 }
 
 func (fc *FunctionCall) String() string {

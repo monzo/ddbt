@@ -28,7 +28,35 @@ func (op *DefineCheck) Position() lexer.Position {
 }
 
 func (op *DefineCheck) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	value, err := op.condition.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return nil, ec.NilResultFor(op.condition)
+	}
+
+	result := false
+
+	switch op.checkType {
+	case "defined":
+		result = !value.IsUndefined
+
+	case "not defined":
+		result = value.IsUndefined
+
+	case "none":
+		result = value.IsNull || value.IsUndefined
+
+	case "not none":
+		result = !value.IsNull && !value.IsUndefined
+
+	default:
+		return nil, ec.ErrorAt(op, fmt.Sprintf("Unknown define check type `%s`", op.checkType))
+
+	}
+
+	return compilerInterface.NewBoolean(result), nil
 }
 
 func (op *DefineCheck) String() string {

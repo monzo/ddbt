@@ -26,7 +26,12 @@ func (n *NotOperator) Position() lexer.Position {
 }
 
 func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	result, err := n.subCondition.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	return compilerInterface.NewBoolean(!result.TruthyValue()), nil
 }
 
 func (n *NotOperator) String() string {

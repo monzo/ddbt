@@ -268,7 +268,12 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 		}
 
 		// Add the parameter
-		macro.AddParameter(paramName.Value, defaultValue)
+		if err := macro.AddParameter(paramName.Value, defaultValue); err != nil {
+			return nil, p.errorAt(
+				paramName,
+				fmt.Sprintf("%s", err),
+			)
+		}
 
 		// If no comma break out of the loop now
 		if !p.peekIs(lexer.CommaToken) {

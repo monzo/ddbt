@@ -25,4 +25,4 @@ type Argument struct {
 
 type Arguments []Argument
 
-type FunctionDef func(ec ExecutionContext, args Arguments) (*Value, error)
+type FunctionDef func(ec ExecutionContext, caller AST, args Arguments) (*Value, error)

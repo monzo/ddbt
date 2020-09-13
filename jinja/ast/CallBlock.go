@@ -28,7 +28,19 @@ func (cb *CallBlock) Position() lexer.Position {
 }
 
 func (cb *CallBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	ec.PushState()
+	defer ec.PopState()
+
+	// Set it so the body AST can be executed using the caller function
+	ec.SetVariable(
+		"caller",
+		compilerInterface.NewFunction(func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+			return cb.body.Execute(ec)
+		}),
+	)
+
+	// Execute the function call
+	return cb.fc.Execute(ec)
 }
 
 func (cb *CallBlock) String() string {

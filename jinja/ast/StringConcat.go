@@ -28,7 +28,23 @@ func (sc *StringConcat) Position() lexer.Position {
 }
 
 func (sc *StringConcat) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	lhs, err := sc.lhs.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if lhs == nil {
+		return nil, ec.NilResultFor(sc.lhs)
+	}
+
+	rhs, err := sc.rhs.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if rhs == nil {
+		return nil, ec.NilResultFor(sc.rhs)
+	}
+
+	return compilerInterface.NewString(lhs.AsStringValue() + rhs.AsStringValue()), nil
 }
 
 func (sc *StringConcat) String() string {

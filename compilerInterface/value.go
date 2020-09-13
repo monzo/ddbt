@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"ddbt/jinja/lexer"
 )
 
 type ValueType string
@@ -97,7 +99,7 @@ func (v *Value) Properties() map[string]*Value {
 
 	case ListVal:
 		return map[string]*Value{
-			"items": NewFunction(func(_ ExecutionContext, _ Arguments) (*Value, error) { return v, nil }),
+			"items": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) { return v, nil }),
 		}
 
 	default:
@@ -235,4 +237,38 @@ func (v *Value) Equals(other *Value) bool {
 
 func (v *Value) String() string {
 	return fmt.Sprintf("%s(%s)", v.Type(), v.AsStringValue())
+}
+
+func ValueFromToken(t *lexer.Token) (*Value, error) {
+	switch t.Type {
+
+	case lexer.StringToken:
+		return NewString(t.Value), nil
+
+	case lexer.NumberToken:
+		f, err := strconv.ParseFloat(t.Value, 64)
+		if err != nil {
+			return nil, err
+		}
+		return NewNumber(f), nil
+
+	case lexer.TrueToken:
+		return NewBoolean(true), nil
+
+	case lexer.FalseToken:
+		return NewBoolean(false), nil
+
+	case lexer.NullToken:
+		return &Value{ValueType: NullVal, IsNull: true}, nil
+
+	case lexer.IdentToken:
+		if t.Value == "none" {
+			return &Value{ValueType: Undefined, IsUndefined: true}, nil
+		} else {
+			return nil, errors.New("unable to convert ident to value: " + t.Value)
+		}
+
+	default:
+		return nil, errors.New(fmt.Sprintf("unable to convert %s to value", t.Type))
+	}
 }

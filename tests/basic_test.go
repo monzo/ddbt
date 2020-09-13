@@ -270,6 +270,24 @@ func TestOrCondition(t *testing.T) {
 		`{% if true or this_shouldnt_be_called_due_to_shortcut() %}Passed{% else %}Failed{% endif %}`)
 }
 
+func TestNotCondition(t *testing.T) {
+	assertCompileOutput(t,
+		"Passed",
+		`{% if not false %}Passed{% else %}Fail{% endif %}`)
+
+	assertCompileOutput(t,
+		"Passed",
+		`{% if not true %}Fail{% else %}Passed{% endif %}`)
+
+	assertCompileOutput(t,
+		"Passed",
+		`{% if not not true %}Passed{% else %}Fail{% endif %}`)
+
+	assertCompileOutput(t,
+		"Passed",
+		`{% if not not not false %}Passed{% else %}Fail{% endif %}`)
+}
+
 func TestLogicalOperators(t *testing.T) {
 	assertCompileOutput(t,
 		"Passed",
@@ -355,4 +373,58 @@ func TestMathUniaryOperators(t *testing.T) {
 	assertCompileOutput(t, "1", `{{ 4 + -3 }}`)
 	assertCompileOutput(t, "-7", `{{ -4 + -3 }}`)
 	assertCompileOutput(t, "-1", `{{ -4 - -3 }}`)
+}
+
+func TestStringConcatOperator(t *testing.T) {
+	assertCompileOutput(t, "hello world",
+		`{% set endWord = "ld" -%}
+				{% set word = "wor" ~ endWord -%}
+				{{ "hello " ~ word }}`)
+}
+
+func TestDefineCheck(t *testing.T) {
+	// Is Defined / Is Not Defined checks
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": "value"} -%}
+			{% if map is defined %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": "value"} -%}
+			{% if map["key"] is defined %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% if random is not defined %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": "value"} -%}
+			{% if map["bar"] is not defined %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	// Is None / not None Checks
+	assertCompileOutput(t, "Passed",
+		`{% if map is none %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map=null -%}
+			{% if map is none %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": null} -%}
+			{% if map["key"] is none %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": "value"} -%}
+			{% if map is not none %}Passed{% else %}Fail{% endif%}`,
+	)
+
+	assertCompileOutput(t, "Passed",
+		`{% set map={ "key": "value"} -%}
+			{% if map["key"] is not none %}Passed{% else %}Fail{% endif%}`,
+	)
 }

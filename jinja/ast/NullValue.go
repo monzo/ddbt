@@ -22,7 +22,7 @@ func (n *NullValue) Position() lexer.Position {
 }
 
 func (n *NullValue) Execute(_ compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return &compilerInterface.Value{IsNull: true}, nil
+	return &compilerInterface.Value{ValueType: compilerInterface.NullVal, IsNull: true}, nil
 }
 
 func (n *NullValue) String() string {

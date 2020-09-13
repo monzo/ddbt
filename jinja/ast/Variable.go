@@ -159,7 +159,7 @@ func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*
 
 	ec.PushState()
 
-	result, err := value.Function(ec, arguments)
+	result, err := value.Function(ec, v, arguments)
 	if err != nil {
 		return nil, err
 	}
