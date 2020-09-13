@@ -5,6 +5,7 @@ import (
 	"ddbt/compilerInterface"
 	"ddbt/fs"
 	"ddbt/jinja"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,6 +45,8 @@ var testVariables = map[string]*compilerInterface.Value{
 		},
 	},
 }
+
+var debugPrintAST = false
 
 func compileFromRaw(t *testing.T, raw string) string {
 	fileSystem, err := fs.InMemoryFileSystem(
@@ -89,6 +92,11 @@ func parseFile(file *fs.File) error {
 	syntaxTree, err := jinja.Parse(file)
 	if err != nil {
 		return err
+	}
+
+	if debugPrintAST {
+		debugPrintAST = false
+		fmt.Println(syntaxTree.String())
 	}
 
 	file.SyntaxTree = syntaxTree

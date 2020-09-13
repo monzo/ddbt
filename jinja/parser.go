@@ -377,7 +377,7 @@ func (p *parser) parseArgumentList(node ast.ArgumentHoldingAST) error {
 	return nil
 }
 
-func (p *parser) parseStatement() (ast.AST, error) {
+func (p *parser) parseValue() (ast.AST, error) {
 	var statement ast.AST
 
 	var err error
@@ -393,6 +393,9 @@ func (p *parser) parseStatement() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		statement = ast.NewBracketGroup(statement)
+
 	} else if p.peekIs(lexer.StringToken) {
 		statement = ast.NewTextBlock(p.next())
 
@@ -414,7 +417,7 @@ func (p *parser) parseStatement() (ast.AST, error) {
 	} else if p.peekIs(lexer.MinusToken) {
 		op := p.next()
 
-		subStatement, err := p.parseStatement()
+		subStatement, err := p.parseValue() // We don't want the statement here, as we don't want greedy operators
 		if err != nil {
 			return nil, err
 		}
@@ -439,6 +442,12 @@ func (p *parser) parseStatement() (ast.AST, error) {
 			return nil, err
 		}
 	}
+
+	return statement, nil
+}
+
+func (p *parser) parseStatement() (ast.AST, error) {
+	statement, err := p.parseValue()
 
 	// Check if the variable has a maths operation
 	statement, err = p.parsePossibleMathsOps(statement)
@@ -550,7 +559,7 @@ func (p *parser) parseStatement() (ast.AST, error) {
 
 func (p *parser) parsePossibleMathsOps(lhs ast.AST) (ast.AST, error) {
 	switch p.peek().Type {
-	case lexer.MultiplyToken, lexer.DivideToken, lexer.PlusToken, lexer.MinusToken:
+	case lexer.MultiplyToken, lexer.DivideToken, lexer.PlusToken, lexer.MinusToken, lexer.PowerToken:
 		op := p.next()
 
 		rhs, err := p.parseStatement()
@@ -558,7 +567,7 @@ func (p *parser) parsePossibleMathsOps(lhs ast.AST) (ast.AST, error) {
 			return nil, err
 		}
 
-		return ast.NewMathsOp(op, lhs, rhs), nil
+		return ast.NewMathsOp(op, lhs, rhs).ApplyOperatorPrecedenceRules(), nil
 	}
 
 	return lhs, nil
@@ -775,6 +784,8 @@ func (p *parser) parseCondition() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		condition = ast.NewBracketGroup(condition)
 	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
 		notToken := p.next()
 

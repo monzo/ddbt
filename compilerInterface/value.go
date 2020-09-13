@@ -140,7 +140,7 @@ func (v *Value) AsStringValue() string {
 		}
 
 	case NumberVal:
-		return fmt.Sprintf("%.f", v.NumberValue)
+		return fmt.Sprintf("%g", v.NumberValue)
 
 	case StringVal:
 		return v.StringValue

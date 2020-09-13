@@ -72,7 +72,7 @@ func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AS
 		builder.WriteString(value.StringValue)
 
 	case compilerInterface.NumberVal:
-		builder.WriteString(fmt.Sprintf("%.f", value.NumberValue))
+		builder.WriteString(fmt.Sprintf("%g", value.NumberValue))
 
 	case compilerInterface.Undefined, compilerInterface.NullVal:
 	// no-op as we can consume these without effect

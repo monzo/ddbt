@@ -331,6 +331,13 @@ func (l *lexer) nextBlockToken() (*Token, error) {
 	case l.currentRune == '+':
 		return l.newToken(PlusToken), nil
 
+	case l.currentRune == '*' && l.nextRune == '*':
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+
+		return l.newToken(PowerToken), nil
+
 	case l.currentRune == '*':
 		return l.newToken(MultiplyToken), nil
 

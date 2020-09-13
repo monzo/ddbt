@@ -45,6 +45,7 @@ const (
 	MinusToken             = "-"
 	PlusToken              = "+"
 	MultiplyToken          = "*"
+	PowerToken             = "**"
 	DivideToken            = "/"
 	PipeToken              = "|"
 	TildeToken             = "~"

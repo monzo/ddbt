@@ -327,3 +327,32 @@ func TestLogicalOperators(t *testing.T) {
 		"Passed",
 		`{% if 1 > 2 %}Fail{% else %}Passed{% endif %}`)
 }
+
+func TestMathOperators(t *testing.T) {
+	assertCompileOutput(t, "4", `{{ 1 + 3 }}`)
+	assertCompileOutput(t, "-2", `{{ 1 - 3 }}`)
+	assertCompileOutput(t, "6", `{{ 2 * 3 }}`)
+	assertCompileOutput(t, "9", `{{ 3 ** 2 }}`)
+	assertCompileOutput(t, "5", `{{ 10 / 2 }}`)
+	assertCompileOutput(t, "2.5", `{{ 5 / 2 }}`)
+}
+
+func TestMathOperatorPrecedence(t *testing.T) {
+	assertCompileOutput(t, "14", `{{ 2 + 3 * 4 }}`) // Should be parsed as 2 + (3 * 4)
+	assertCompileOutput(t, "10", `{{ 2 * 3 + 4 }}`) // Should be parsed as (2 * 3) + 4
+
+	assertCompileOutput(t, "19", `{{   2 + 3  *  4 + 5  }}`) // Should be parsed as 2 + (3 * 4) + 5
+	assertCompileOutput(t, "25", `{{  (2 + 3) *  4 + 5  }}`)
+	assertCompileOutput(t, "29", `{{   2 + 3  * (4 + 5) }}`)
+	assertCompileOutput(t, "45", `{{  (2 + 3) * (4 + 5) }}`)
+
+	assertCompileOutput(t, "-18", `{{  -10 / (20 / 2 ** 2 * 5 / 5) * 8 - 2 }}`)
+	assertCompileOutput(t, "41", `{{  10 * 4 - 2 * (4 ** 2 / 4) / 2 / 0.5 + 9 }}`)
+}
+
+func TestMathUniaryOperators(t *testing.T) {
+	assertCompileOutput(t, "-3", `{{ -3 }}`)
+	assertCompileOutput(t, "1", `{{ 4 + -3 }}`)
+	assertCompileOutput(t, "-7", `{{ -4 + -3 }}`)
+	assertCompileOutput(t, "-1", `{{ -4 - -3 }}`)
+}

@@ -30,5 +30,5 @@ func (n *Number) Execute(_ compilerInterface.ExecutionContext) (*compilerInterfa
 }
 
 func (n *Number) String() string {
-	return fmt.Sprintf("%.f", n.number)
+	return fmt.Sprintf("%g", n.number)
 }

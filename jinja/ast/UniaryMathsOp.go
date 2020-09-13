@@ -28,7 +28,32 @@ func (op *UniaryMathsOp) Position() lexer.Position {
 }
 
 func (op *UniaryMathsOp) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	value, err := op.value.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return nil, ec.NilResultFor(op.value)
+	}
+	valueNum, err := value.AsNumberValue()
+	if err != nil {
+		return nil, ec.ErrorAt(op.value, fmt.Sprintf("%s", err))
+	}
+
+	var result float64
+
+	switch op.op {
+	case lexer.PlusToken:
+		result = +valueNum
+
+	case lexer.MinusToken:
+		result = -valueNum
+
+	default:
+		return nil, ec.ErrorAt(op, fmt.Sprintf("Unknown maths uniary operator `%s`", op.op))
+	}
+
+	return compilerInterface.NewNumber(result), nil
 }
 
 func (op *UniaryMathsOp) String() string {
