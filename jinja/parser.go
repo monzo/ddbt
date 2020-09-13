@@ -373,6 +373,9 @@ func (p *parser) parseStatement() (ast.AST, error) {
 	} else if p.peekIs(lexer.NumberToken) {
 		statement = ast.NewNumber(p.next())
 
+	} else if p.peekIs(lexer.NullToken) {
+		statement = ast.NewNullValue(p.next())
+
 	} else if p.peekIs(lexer.TrueToken) || p.peekIs(lexer.FalseToken) {
 		statement = ast.NewBoolValue(p.next())
 
@@ -586,9 +589,21 @@ func (p *parser) parseVariable(ident *lexer.Token) (*ast.Variable, error) {
 }
 
 func (p *parser) parseForLoop() (ast.AST, error) {
-	iteratorName, err := p.expectedAndConsumeValue(lexer.IdentToken)
+	keyIteratorName := ""
+	valueIterator, err := p.expectedAndConsumeValue(lexer.IdentToken)
 	if err != nil {
 		return nil, err
+	}
+
+	if p.peekIs(lexer.CommaToken) {
+		p.next()
+
+		keyIteratorName = valueIterator.Value
+
+		valueIterator, err = p.expectedAndConsumeValue(lexer.IdentToken)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := p.expectedAndConsumeIdentifier("in"); err != nil {
@@ -605,7 +620,7 @@ func (p *parser) parseForLoop() (ast.AST, error) {
 		return nil, err
 	}
 
-	forLoop := ast.NewForLoop(iteratorName, list)
+	forLoop := ast.NewForLoop(valueIterator, keyIteratorName, list)
 
 	if err := p.parseBodyUntilAtom("endfor", forLoop); err != nil {
 		return nil, err
@@ -838,13 +853,10 @@ func (p *parser) parseList() (ast.AST, error) {
 
 		list.Append(item)
 
-		if !p.peekIs(lexer.CommaToken) {
-			break
-		}
-
-		_, err = p.expectedAndConsumeValue(lexer.CommaToken)
-		if err != nil {
-			return nil, err
+		// If the next character is a comma token then consume it
+		// but a list may not be comma seperated in lists
+		if p.peekIs(lexer.CommaToken) {
+			_ = p.next()
 		}
 	}
 
@@ -922,10 +934,15 @@ func (p *parser) parseMap() (ast.AST, error) {
 			return nil, err
 		}
 
-		value := p.next()
-		if value.Type != lexer.StringToken && value.Type != lexer.NumberToken && value.Type != lexer.NullToken {
-			return nil, p.errorAt(value, "Expected string, number or null")
+		value, err := p.parseStatement()
+		if err != nil {
+			return nil, err
 		}
+
+		//value := p.next()
+		//if value.Type != lexer.StringToken && value.Type != lexer.NumberToken && value.Type != lexer.NullToken {
+		//	return nil, p.errorAt(value, "Expected string, number or null")
+		//}
 
 		m.Put(key, value)
 

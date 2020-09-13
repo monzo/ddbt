@@ -9,7 +9,8 @@ import (
 // A block which represents a simple
 type ForLoop struct {
 	position     lexer.Position
-	iteratorName string
+	keyItrName   string
+	valueItrName string
 	list         *Variable
 	body         *Body
 }
@@ -21,12 +22,13 @@ type ForLoopParameter struct {
 
 var _ AST = &ForLoop{}
 
-func NewForLoop(iteratorToken *lexer.Token, list *Variable) *ForLoop {
+func NewForLoop(valueItrToken *lexer.Token, keyItr string, list *Variable) *ForLoop {
 	return &ForLoop{
-		position:     iteratorToken.Start,
-		iteratorName: iteratorToken.Value,
+		position:     valueItrToken.Start,
+		keyItrName:   keyItr,
+		valueItrName: valueItrToken.Value,
 		list:         list,
-		body:         NewBody(iteratorToken),
+		body:         NewBody(valueItrToken),
 	}
 }
 
@@ -40,7 +42,11 @@ func (fl *ForLoop) Execute(_ *ExecutionContext) AST {
 }
 
 func (fl *ForLoop) String() string {
-	return fmt.Sprintf("\n{%% for %s in %s %%}%s{%% endfor %%}", fl.iteratorName, fl.list.String(), fl.body.String())
+	if fl.keyItrName != "" {
+		return fmt.Sprintf("\n{%% for %s, %s in %s %%}%s{%% endfor %%}", fl.keyItrName, fl.valueItrName, fl.list.String(), fl.body.String())
+	} else {
+		return fmt.Sprintf("\n{%% for %s in %s %%}%s{%% endfor %%}", fl.valueItrName, fl.list.String(), fl.body.String())
+	}
 }
 
 func (fl *ForLoop) AppendBody(node AST) {
