@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"ddbt/fs"
 	"ddbt/jinja"
+	"ddbt/utils"
 )
 
 func main() {
@@ -14,32 +14,25 @@ func main() {
 		log.Fatalf("Unable to read filesystem: %s", err)
 	}
 
-	//model := fileSystem.Model("")
-	//if model != nil {
-	//	fmt.Printf("Processing %s\n", model.Name)
-	//
-	//	body, err := jinja.Parse(model)
-	//	if err != nil {
-	//		log.Fatalf("Unable to parse model %s : %s", model.Name, err)
-	//	}
-	//
-	//	fmt.Println(body)
-	//}
+	parseFiles(fileSystem)
 
-	for _, macro := range fileSystem.Macros() {
-		fmt.Printf("Processing %s\n", macro.Name)
+	pb := utils.NewProgressBar("📝 Compiling Models", len(fileSystem.Models()))
+	pb.Start()
+}
 
-		_, err := jinja.Parse(macro)
-		if err != nil {
-			log.Fatalf("Unable to parse macro %s : %s", macro.Name, err)
-		}
-	}
+func parseFiles(fileSystem *fs.FileSystem) {
+	pb := utils.NewProgressBar("📜 Reading & Parsing Files", fileSystem.NumberFiles())
+	defer pb.Stop()
 
-	for _, model := range fileSystem.Models() {
-		fmt.Printf("Processing %s\n", model.Name)
+	utils.ProcessFiles(
+		fileSystem.AllFiles(),
+		func(file *fs.File) {
+			_, err := jinja.Parse(file)
+			if err != nil {
+				log.Fatalf("Unable to parse %s : %s", file.Name, err)
+			}
 
-		if _, err := jinja.Parse(model); err != nil {
-			log.Fatalf("Unable to parse model %s : %s", model.Name, err)
-		}
-	}
+			pb.Increment()
+		},
+	)
 }

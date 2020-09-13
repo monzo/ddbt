@@ -29,7 +29,7 @@ func ReadFileSystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Loaded %d files; %d macros, %d models\n", len(fs.files), len(fs.macroLookup), len(fs.files)-len(fs.macroLookup))
+	fmt.Printf("🔎 Found %d models, %d macros\n", len(fs.files)-len(fs.macroLookup), len(fs.macroLookup))
 
 	return fs, nil
 }
@@ -111,6 +111,10 @@ func (fs *FileSystem) mapModelLookupOptions(file *File) error {
 	return nil
 }
 
+func (fs *FileSystem) NumberFiles() int {
+	return len(fs.files)
+}
+
 // Returns a model by name or nil if the model is not found
 func (fs *FileSystem) Model(name string) *File {
 	return fs.modelLookup[name]
@@ -142,4 +146,8 @@ func (fs *FileSystem) Macros() []*File {
 	}
 
 	return macros
+}
+
+func (fs *FileSystem) AllFiles() []*File {
+	return fs.files
 }
