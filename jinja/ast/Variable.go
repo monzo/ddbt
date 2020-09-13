@@ -3,7 +3,6 @@ package ast
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"ddbt/compilerInterface"
@@ -43,7 +42,7 @@ func (v *Variable) Position() lexer.Position {
 	return v.token.Start
 }
 
-func (v *Variable) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (v *Variable) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	variable, err := v.resolve(ec)
 	if err != nil {
 		return nil, err
@@ -52,21 +51,11 @@ func (v *Variable) Execute(ec compilerInterface.ExecutionContext) (compilerInter
 	if variable == nil {
 		return nil, ec.ErrorAt(v, "nil variable received after resolve")
 	} else {
-		t := variable.Type()
-		switch t {
-		case compilerInterface.StringVar:
-			return newTextBlockAt(v.token.Start, variable.StringValue), nil
-
-		case compilerInterface.NumberVar:
-			return newTextBlockAt(v.token.Start, fmt.Sprintf("%.f", variable.NumberValue)), nil
-
-		default:
-			return nil, ec.ErrorAt(v, fmt.Sprintf("unable to convert return data type %s into AST", t))
-		}
+		return variable, nil
 	}
 }
 
-func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInterface.Variable, error) {
+func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	switch v.varType {
 	case identVar:
 		return ec.GetVariable(v.token.Value), nil
@@ -82,7 +71,7 @@ func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInte
 	}
 }
 
-func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Variable, error) {
+func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	value, err := v.subVariable.resolve(ec)
 	if err != nil {
 		return nil, err
@@ -95,15 +84,16 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 	if lookupKey == nil {
 		return nil, ec.ErrorAt(v.lookupKey, fmt.Sprintf("lookup key execution returned nil from %s", reflect.TypeOf(v.lookupKey)))
 	}
-	lookupKeyStr := lookupKey.String()
 
 	t := value.Type()
 	switch t {
-	case compilerInterface.ListVar:
-		index, err := strconv.Atoi(lookupKeyStr)
-		if err != nil {
-			return nil, ec.ErrorAt(v, fmt.Sprintf("uable to convert index `%s` to number: %s", lookupKeyStr, err))
+	case compilerInterface.ListVal:
+		lt := lookupKey.Type()
+		if lt != compilerInterface.NumberVal && !(lookupKey.Type() == compilerInterface.StringVal && lookupKey.StringValue == "") {
+			return nil, ec.ErrorAt(v.lookupKey, fmt.Sprintf("Number required to index into a list, got %s", lt))
 		}
+
+		index := int(lookupKey.NumberValue)
 
 		if index < 0 {
 			return nil, ec.ErrorAt(v.lookupKey, fmt.Sprintf("index below 0, got: %d", index))
@@ -114,10 +104,15 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 
 		return value.ListValue[index], nil
 
-	case compilerInterface.MapVar:
-		rtnValue, found := value.MapValue[lookupKeyStr]
+	case compilerInterface.MapVal:
+		lt := lookupKey.Type()
+		if lt != compilerInterface.StringVal || lookupKey.StringValue == "" {
+			return nil, ec.ErrorAt(v.lookupKey, fmt.Sprintf("String required to index into a map, got %s", lt))
+		}
+
+		rtnValue, found := value.MapValue[lookupKey.StringValue]
 		if !found {
-			return &compilerInterface.Variable{IsUndefined: true}, nil
+			return &compilerInterface.Value{IsUndefined: true}, nil
 		}
 		return rtnValue, nil
 
@@ -126,7 +121,7 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 	}
 }
 
-func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Variable, error) {
+func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	value, err := v.subVariable.resolve(ec)
 	if err != nil {
 		return nil, err
@@ -134,10 +129,10 @@ func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) 
 
 	t := value.Type()
 	switch t {
-	case compilerInterface.MapVar:
+	case compilerInterface.MapVal:
 		rtnValue, found := value.MapValue[v.token.Value]
 		if !found {
-			return &compilerInterface.Variable{IsUndefined: true}, nil
+			return &compilerInterface.Value{IsUndefined: true}, nil
 		}
 		return rtnValue, nil
 

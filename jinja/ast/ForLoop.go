@@ -37,7 +37,7 @@ func (fl *ForLoop) Position() lexer.Position {
 	return fl.position
 }
 
-func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	// TODO add a map variable called "loop" with a "last" bool param
 	return nil, nil
 }

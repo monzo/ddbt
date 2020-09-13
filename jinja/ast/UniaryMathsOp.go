@@ -27,7 +27,7 @@ func (op *UniaryMathsOp) Position() lexer.Position {
 	return op.position
 }
 
-func (op *UniaryMathsOp) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (op *UniaryMathsOp) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

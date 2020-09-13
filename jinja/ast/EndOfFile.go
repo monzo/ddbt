@@ -22,8 +22,8 @@ func (eof *EndOfFile) Position() lexer.Position {
 	return eof.position
 }
 
-func (eof *EndOfFile) Execute(_ compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
-	return newTextBlockAt(eof.position, ""), nil
+func (eof *EndOfFile) Execute(_ compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	return &compilerInterface.Value{IsUndefined: true}, nil
 }
 
 func (eof *EndOfFile) String() string {

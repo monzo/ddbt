@@ -27,7 +27,7 @@ func (cb *CallBlock) Position() lexer.Position {
 	return cb.position
 }
 
-func (cb *CallBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (cb *CallBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

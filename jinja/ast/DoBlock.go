@@ -25,7 +25,7 @@ func (d *DoBlock) Position() lexer.Position {
 	return d.position
 }
 
-func (d *DoBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (d *DoBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

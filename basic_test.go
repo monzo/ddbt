@@ -11,15 +11,15 @@ import (
 	"ddbt/fs"
 )
 
-var testVariables = map[string]*compilerInterface.Variable{
+var testVariables = map[string]*compilerInterface.Value{
 	"table_name":       {StringValue: "BLAH"},
 	"number_value":     {NumberValue: 1},
 	"str_number_value": {StringValue: "2"},
 	"map_object": {
-		MapValue: map[string]*compilerInterface.Variable{
+		MapValue: map[string]*compilerInterface.Value{
 			"string": {StringValue: "test"},
 			"nested": {
-				MapValue: map[string]*compilerInterface.Variable{
+				MapValue: map[string]*compilerInterface.Value{
 					"number": {NumberValue: 3},
 					"string": {StringValue: "FROM"},
 				},
@@ -28,16 +28,16 @@ var testVariables = map[string]*compilerInterface.Variable{
 		},
 	},
 	"list_object": {
-		ListValue: []*compilerInterface.Variable{
+		ListValue: []*compilerInterface.Value{
 			{StringValue: "first option is string"},
 			{StringValue: "second option a string too!"},
 			{StringValue: "third"},
-			{MapValue: map[string]*compilerInterface.Variable{
-				"blah": {ListValue: []*compilerInterface.Variable{
+			{MapValue: map[string]*compilerInterface.Value{
+				"blah": {ListValue: []*compilerInterface.Value{
 					{StringValue: "thingy"},
 				}},
 			}},
-			{ListValue: []*compilerInterface.Variable{
+			{ListValue: []*compilerInterface.Value{
 				{StringValue: "nested list test"},
 				{NumberValue: 3},
 			}},
@@ -88,7 +88,6 @@ func TestMapVariables(t *testing.T) {
 func TestComplexVariableCombination(t *testing.T) {
 	assertCompileOutput(t, "3", "{{ map_object.nested.number }}")
 	assertCompileOutput(t, "thingy", "{{ list_object[3].blah[0] }}")
-	assertCompileOutput(t, "thingy", "{{ list_object['3'].blah[0] }}")
 	assertCompileOutput(t, "thingy", "{{ list_object[map_object.nested.number].blah[0] }}")
 	assertCompileOutput(t, "thingy", "{{ list_object[map_object['nested']['number']].blah[0] }}")
 	assertCompileOutput(t, "thingy", "{{ list_object[list_object[4][1]].blah[0] }}")
@@ -119,8 +118,9 @@ func compileFromRaw(t *testing.T, raw string) string {
 	finalAST, err := file.SyntaxTree.Execute(ec)
 	require.NoError(t, err)
 	require.NotNil(t, finalAST, "Output AST is nil")
+	require.Equal(t, compilerInterface.StringVal, finalAST.Type())
 
-	return finalAST.String()
+	return finalAST.StringValue
 }
 
 func assertCompileOutput(t *testing.T, expected, input string) {

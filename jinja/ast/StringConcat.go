@@ -27,7 +27,7 @@ func (sc *StringConcat) Position() lexer.Position {
 	return sc.position
 }
 
-func (sc *StringConcat) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (sc *StringConcat) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

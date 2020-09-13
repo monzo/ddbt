@@ -27,7 +27,7 @@ func (sc *SetCall) Position() lexer.Position {
 	return sc.position
 }
 
-func (sc *SetCall) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (sc *SetCall) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

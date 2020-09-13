@@ -28,31 +28,50 @@ func (b *Body) Position() lexer.Position {
 	return b.position
 }
 
-func (b *Body) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (b *Body) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	// A body should compile down to only text blocks
 	var builder strings.Builder
 
 	for _, part := range b.parts {
-		newPart, err := part.Execute(ec)
+		result, err := part.Execute(ec)
 		if err != nil {
 			return nil, err
 		}
 
-		if _, ok := newPart.(*TextBlock); !ok {
+		if result == nil {
 			return nil, ec.ErrorAt(
-				newPart,
+				b,
 				fmt.Sprintf(
-					"part did not compile down to plain text; got %v from %v",
-					reflect.TypeOf(newPart),
+					"A %v did not return a value",
 					reflect.TypeOf(part),
 				),
 			)
 		}
 
-		builder.WriteString(newPart.String())
+		t := result.Type()
+		switch t {
+		case compilerInterface.StringVal:
+			builder.WriteString(result.StringValue)
+
+		case compilerInterface.NumberVal:
+			builder.WriteString(fmt.Sprintf("%.f", result.NumberValue))
+
+		case compilerInterface.Undefined, compilerInterface.NullVal:
+		// no-op as we can consume these without effect
+
+		default:
+			return nil, ec.ErrorAt(
+				part,
+				fmt.Sprintf(
+					"A %v returned a %s which can not be combined into a body",
+					reflect.TypeOf(part),
+					t,
+				),
+			)
+		}
 	}
 
-	return newTextBlockAt(b.position, strings.TrimSpace(builder.String())), nil
+	return &compilerInterface.Value{StringValue: strings.TrimSpace(builder.String())}, nil
 }
 
 func (b *Body) String() string {

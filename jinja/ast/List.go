@@ -26,7 +26,7 @@ func (l *List) Position() lexer.Position {
 	return l.position
 }
 
-func (l *List) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (l *List) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

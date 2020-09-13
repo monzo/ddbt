@@ -8,7 +8,7 @@ import (
 )
 
 type ExecutionContext struct {
-	variables map[string]*compilerInterface.Variable
+	variables map[string]*compilerInterface.Value
 }
 
 // Ensure our execution context matches the interface in the AST package
@@ -16,18 +16,18 @@ var _ compilerInterface.ExecutionContext = &ExecutionContext{}
 
 func NewExecutionContext() *ExecutionContext {
 	return &ExecutionContext{
-		variables: make(map[string]*compilerInterface.Variable),
+		variables: make(map[string]*compilerInterface.Value),
 	}
 }
 
-func (e *ExecutionContext) SetVariable(name string, value *compilerInterface.Variable) {
+func (e *ExecutionContext) SetVariable(name string, value *compilerInterface.Value) {
 	e.variables[name] = value
 }
 
-func (e *ExecutionContext) GetVariable(name string) *compilerInterface.Variable {
+func (e *ExecutionContext) GetVariable(name string) *compilerInterface.Value {
 	variable, found := e.variables[name]
 	if !found {
-		return &compilerInterface.Variable{IsUndefined: true}
+		return &compilerInterface.Value{IsUndefined: true}
 	} else {
 		return variable
 	}

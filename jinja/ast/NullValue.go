@@ -21,8 +21,8 @@ func (n *NullValue) Position() lexer.Position {
 	return n.position
 }
 
-func (n *NullValue) Execute(_ compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
-	return newTextBlockAt(n.position, ""), nil
+func (n *NullValue) Execute(_ compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	return &compilerInterface.Value{IsNull: true}, nil
 }
 
 func (n *NullValue) String() string {

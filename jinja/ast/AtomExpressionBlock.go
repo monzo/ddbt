@@ -24,7 +24,7 @@ func (a *AtomExpressionBlock) Position() lexer.Position {
 	return a.token.Start
 }
 
-func (a *AtomExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (a *AtomExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

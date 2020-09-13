@@ -25,7 +25,7 @@ func (a *AndCondition) Position() lexer.Position {
 	return a.a.Position()
 }
 
-func (a *AndCondition) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (a *AndCondition) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

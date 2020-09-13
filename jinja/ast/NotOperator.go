@@ -25,7 +25,7 @@ func (n *NotOperator) Position() lexer.Position {
 	return n.position
 }
 
-func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

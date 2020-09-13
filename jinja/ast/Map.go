@@ -23,7 +23,7 @@ func (m *Map) Position() lexer.Position {
 	return m.position
 }
 
-func (m *Map) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (m *Map) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

@@ -36,7 +36,7 @@ func (m *Macro) Position() lexer.Position {
 	return m.position
 }
 
-func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	// Default param might be None!
 	return nil, nil
 }

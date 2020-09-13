@@ -9,15 +9,15 @@ import (
 
 type Number struct {
 	position lexer.Position
-	value    string
+	number   float64
 }
 
 var _ AST = &Number{}
 
-func NewNumber(token *lexer.Token) *Number {
+func NewNumber(token *lexer.Token, number float64) *Number {
 	return &Number{
 		position: token.Start,
-		value:    token.Value,
+		number:   number,
 	}
 }
 
@@ -25,10 +25,10 @@ func (n *Number) Position() lexer.Position {
 	return n.position
 }
 
-func (n *Number) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
-	return newTextBlockAt(n.position, n.value), nil
+func (n *Number) Execute(_ compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	return &compilerInterface.Value{NumberValue: n.number}, nil
 }
 
 func (n *Number) String() string {
-	return fmt.Sprintf("%s", n.value)
+	return fmt.Sprintf("%.f", n.number)
 }

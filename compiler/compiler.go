@@ -3,6 +3,7 @@ package compiler
 import (
 	"errors"
 
+	"ddbt/compilerInterface"
 	"ddbt/fs"
 )
 
@@ -18,5 +19,9 @@ func CompileModel(file *fs.File) (string, error) {
 		return "", errors.New("no AST returned after execution")
 	}
 
-	return finalAST.String(), err
+	if finalAST.Type() != compilerInterface.StringVal {
+		return "", errors.New("AST did not return a string")
+	}
+
+	return finalAST.StringValue, err
 }

@@ -28,7 +28,7 @@ func (is *IfStatement) Position() lexer.Position {
 	return is.condition.Position()
 }
 
-func (is *IfStatement) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (is *IfStatement) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

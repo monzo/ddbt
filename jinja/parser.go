@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"ddbt/fs"
@@ -387,7 +388,13 @@ func (p *parser) parseStatement() (ast.AST, error) {
 		statement = ast.NewTextBlock(p.next())
 
 	} else if p.peekIs(lexer.NumberToken) {
-		statement = ast.NewNumber(p.next())
+		token := p.next()
+		number, err := strconv.ParseFloat(token.Value, 64)
+		if err != nil {
+			return nil, p.errorAt(token, fmt.Sprintf("Unable to parse number: %s", err))
+		}
+
+		statement = ast.NewNumber(token, number)
 
 	} else if p.peekIs(lexer.NullToken) {
 		statement = ast.NewNullValue(p.next())

@@ -3,46 +3,66 @@ package compilerInterface
 import "ddbt/jinja/lexer"
 
 type ExecutionContext interface {
-	SetVariable(name string, value *Variable)
-	GetVariable(name string) *Variable
+	SetVariable(name string, value *Value)
+	GetVariable(name string) *Value
 	ErrorAt(part AST, error string) error
 }
 
 type AST interface {
-	Execute(ec ExecutionContext) (AST, error)
+	Execute(ec ExecutionContext) (*Value, error)
 	Position() lexer.Position
 	String() string
 }
 
-type VariableType string
+type ValueType string
 
 const (
-	Undefined VariableType = "undefined"
-	StringVar              = "String"
-	NumberVar              = "Number"
-	MapVar                 = "Map"
-	ListVar                = "List"
+	Undefined     ValueType = "undefined"
+	NullVal       ValueType = "null"
+	StringVal     ValueType = "String"
+	NumberVal     ValueType = "Number"
+	MapVal        ValueType = "Map"
+	ListVal       ValueType = "List"
+	FunctionalVal ValueType = "Function"
 )
 
-type Variable struct {
+type Value struct {
 	StringValue string
 	NumberValue float64
-	MapValue    map[string]*Variable
-	ListValue   []*Variable
+	MapValue    map[string]*Value
+	ListValue   []*Value
+	Function    AST
 	IsUndefined bool
+	IsNull      bool
 }
 
-func (v *Variable) Type() VariableType {
+func (v *Value) Type() ValueType {
 	switch {
 	case v.IsUndefined:
 		return Undefined
+
+	case v.IsNull:
+		return NullVal
+
 	case v.MapValue != nil:
-		return MapVar
+		return MapVal
+
 	case v.ListValue != nil:
-		return ListVar
+		return ListVal
+
 	case v.NumberValue != 0:
-		return NumberVar
+		return NumberVal
+
+	case v.StringValue != "":
+		return StringVal
+
+	case v.Function != nil:
+		// Note: function call is last so that if a user overrides a function
+		// with a value, we could still the original function/macro
+		return FunctionalVal
+
 	default:
-		return StringVar
+		// Incase of "" as the value
+		return StringVal
 	}
 }

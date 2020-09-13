@@ -29,7 +29,7 @@ func (op *MathsOp) Position() lexer.Position {
 	return op.position
 }
 
-func (op *MathsOp) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (op *MathsOp) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

@@ -23,7 +23,7 @@ func (b *BoolValue) Position() lexer.Position {
 	return b.position
 }
 
-func (b *BoolValue) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (b *BoolValue) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

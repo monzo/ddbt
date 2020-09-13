@@ -27,7 +27,7 @@ func (op *DefineCheck) Position() lexer.Position {
 	return op.position
 }
 
-func (op *DefineCheck) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (op *DefineCheck) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

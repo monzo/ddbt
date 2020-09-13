@@ -21,7 +21,7 @@ func (b *UnsupportedExpressionBlock) Position() lexer.Position {
 	return b.position
 }
 
-func (b *UnsupportedExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (b *UnsupportedExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 

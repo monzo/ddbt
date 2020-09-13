@@ -33,7 +33,7 @@ func (fc *FunctionCall) Position() lexer.Position {
 	return fc.position
 }
 
-func (fc *FunctionCall) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.AST, error) {
+func (fc *FunctionCall) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	return nil, nil
 }
 
