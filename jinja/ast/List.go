@@ -27,7 +27,26 @@ func (l *List) Position() lexer.Position {
 }
 
 func (l *List) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	resultList := make([]*compilerInterface.Value, 0, len(l.items))
+
+	for _, item := range l.items {
+		result, err := item.Execute(ec)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if result == nil {
+			return nil, ec.NilResultFor(item)
+		}
+
+		resultList = append(resultList, result)
+	}
+
+	return &compilerInterface.Value{
+		ValueType: compilerInterface.ListVal,
+		ListValue: resultList,
+	}, nil
 }
 
 func (l *List) String() string {

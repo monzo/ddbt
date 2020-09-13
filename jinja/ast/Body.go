@@ -38,40 +38,12 @@ func (b *Body) Execute(ec compilerInterface.ExecutionContext) (*compilerInterfac
 			return nil, err
 		}
 
-		if result == nil {
-			return nil, ec.ErrorAt(
-				b,
-				fmt.Sprintf(
-					"A %v did not return a value",
-					reflect.TypeOf(part),
-				),
-			)
-		}
-
-		t := result.Type()
-		switch t {
-		case compilerInterface.StringVal:
-			builder.WriteString(result.StringValue)
-
-		case compilerInterface.NumberVal:
-			builder.WriteString(fmt.Sprintf("%.f", result.NumberValue))
-
-		case compilerInterface.Undefined, compilerInterface.NullVal:
-		// no-op as we can consume these without effect
-
-		default:
-			return nil, ec.ErrorAt(
-				part,
-				fmt.Sprintf(
-					"A %v returned a %s which can not be combined into a body",
-					reflect.TypeOf(part),
-					t,
-				),
-			)
+		if err := writeValue(ec, part, &builder, result); err != nil {
+			return nil, err
 		}
 	}
 
-	return &compilerInterface.Value{StringValue: strings.TrimSpace(builder.String())}, nil
+	return &compilerInterface.Value{StringValue: builder.String()}, nil
 }
 
 func (b *Body) String() string {
@@ -87,4 +59,34 @@ func (b *Body) String() string {
 // Append a node to the body
 func (b *Body) Append(node AST) {
 	b.parts = append(b.parts, node)
+}
+
+func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AST, builder *strings.Builder, value *compilerInterface.Value) error {
+	if value == nil {
+		return ec.NilResultFor(part)
+	}
+
+	t := value.Type()
+	switch t {
+	case compilerInterface.StringVal:
+		builder.WriteString(value.StringValue)
+
+	case compilerInterface.NumberVal:
+		builder.WriteString(fmt.Sprintf("%.f", value.NumberValue))
+
+	case compilerInterface.Undefined, compilerInterface.NullVal:
+	// no-op as we can consume these without effect
+
+	default:
+		return ec.ErrorAt(
+			part,
+			fmt.Sprintf(
+				"A %v returned a %s which can not be combined into a body",
+				reflect.TypeOf(part),
+				t,
+			),
+		)
+	}
+
+	return nil
 }

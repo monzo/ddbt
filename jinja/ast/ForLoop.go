@@ -2,6 +2,8 @@ package ast
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
@@ -38,8 +40,100 @@ func (fl *ForLoop) Position() lexer.Position {
 }
 
 func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	// TODO add a map variable called "loop" with a "last" bool param
-	return nil, nil
+	// Get the list
+	list, err := fl.list.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, ec.NilResultFor(fl.list)
+	}
+
+	switch list.Type() {
+	case compilerInterface.ListVal:
+		return fl.executeForList(list.ListValue, ec)
+
+	case compilerInterface.MapVal:
+		return fl.executeForMap(list.MapValue, ec)
+
+	default:
+		return nil, ec.ErrorAt(fl, fmt.Sprintf("unable to run for each over %s", list.Type()))
+	}
+}
+
+func (fl *ForLoop) executeForList(list []*compilerInterface.Value, ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	var builder strings.Builder
+
+	for index, value := range list {
+		ec.PushState()
+
+		// Set the loop variables
+		ec.SetVariable("loop", &compilerInterface.Value{
+			MapValue: map[string]*compilerInterface.Value{
+				"last": compilerInterface.NewBoolean(index == (len(list) - 1)),
+			},
+		})
+		if fl.keyItrName != "" {
+			ec.SetVariable(fl.keyItrName, compilerInterface.NewNumber(float64(index)))
+		}
+		ec.SetVariable(fl.valueItrName, value)
+
+		result, err := fl.body.Execute(ec)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := writeValue(ec, fl.body, &builder, result); err != nil {
+			return nil, err
+		}
+
+		ec.PopState()
+	}
+
+	return &compilerInterface.Value{StringValue: builder.String()}, nil
+}
+
+func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	var builder strings.Builder
+
+	num := 0
+
+	// Sort keys so this loop excutes stably (i.e. the order doesn't change each time)
+	keys := make([]string, 0, len(list))
+	for key := range list {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for index, key := range keys {
+		ec.PushState()
+
+		// Set the loop variables
+		ec.SetVariable("loop", &compilerInterface.Value{
+			MapValue: map[string]*compilerInterface.Value{
+				"last": compilerInterface.NewBoolean(index == (len(list) - 1)),
+			},
+		})
+
+		if fl.keyItrName != "" {
+			ec.SetVariable(fl.keyItrName, compilerInterface.NewString(key))
+		}
+		ec.SetVariable(fl.valueItrName, list[key])
+
+		result, err := fl.body.Execute(ec)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := writeValue(ec, fl.body, &builder, result); err != nil {
+			return nil, err
+		}
+
+		ec.PopState()
+		num++
+	}
+
+	return &compilerInterface.Value{StringValue: builder.String()}, nil
 }
 
 func (fl *ForLoop) String() string {

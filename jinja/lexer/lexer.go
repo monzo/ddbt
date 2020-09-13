@@ -255,6 +255,11 @@ func (l *lexer) nextBlockToken() (*Token, error) {
 			return l.newTokenWithValue(ErrorToken, fmt.Sprintf("Expected } got %s", string(l.nextRune))), errors.New("unexpected char")
 		}
 
+		// Finally consume the '}'
+		if err := l.readRune(); err != nil {
+			return nil, err
+		}
+
 		// Mark us as leaving a code block
 		l.inBlock = false
 

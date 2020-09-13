@@ -24,7 +24,7 @@ func (b *BoolValue) Position() lexer.Position {
 }
 
 func (b *BoolValue) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	return compilerInterface.NewBoolean(b.value), nil
 }
 
 func (b *BoolValue) String() string {

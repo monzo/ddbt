@@ -29,7 +29,23 @@ func (is *IfStatement) Position() lexer.Position {
 }
 
 func (is *IfStatement) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	conditionResult, err := is.condition.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if conditionResult == nil {
+		return nil, ec.NilResultFor(is.condition)
+	}
+
+	if conditionResult.TruthyValue() {
+		if is.body != nil {
+			return is.body.Execute(ec)
+		}
+	} else if is.elseBody != nil {
+		return is.elseBody.Execute(ec)
+	}
+
+	return &compilerInterface.Value{IsUndefined: true}, nil
 }
 
 func (is *IfStatement) String() string {

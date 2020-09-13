@@ -26,7 +26,30 @@ func (a *AndCondition) Position() lexer.Position {
 }
 
 func (a *AndCondition) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	// Execute the LHS
+	result, err := a.a.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, ec.NilResultFor(a.a)
+	}
+
+	// Short circuit
+	if !result.TruthyValue() {
+		return compilerInterface.NewBoolean(false), nil
+	}
+
+	// Execute the RHS
+	result, err = a.b.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, ec.NilResultFor(a.b)
+	}
+
+	return compilerInterface.NewBoolean(result.TruthyValue()), nil
 }
 
 func (a *AndCondition) String() string {

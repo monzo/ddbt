@@ -1,14 +1,14 @@
-package main
+package tests
 
 import (
+	"ddbt/compiler"
+	"ddbt/compilerInterface"
+	"ddbt/fs"
+	"ddbt/jinja"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"ddbt/compiler"
-	"ddbt/compilerInterface"
-	"ddbt/fs"
 )
 
 var testVariables = map[string]*compilerInterface.Value{
@@ -43,54 +43,6 @@ var testVariables = map[string]*compilerInterface.Value{
 			}},
 		},
 	},
-}
-
-func TestNoJinjaTemplating(t *testing.T) {
-	const raw = "SELECT * FROM BLAH"
-	assertCompileOutput(t, raw, raw)
-}
-
-func TestCommentBlocks(t *testing.T) {
-	const raw = "SELECT * FROM BLAH"
-	assertCompileOutput(t, raw, "{# Test Comment #}"+raw)
-	assertCompileOutput(t, raw, "{# Test Comment #}\n\t"+raw)
-	assertCompileOutput(t, raw, raw+"{# Test Comment #}")
-	assertCompileOutput(t, raw, raw+"\n\t{# Test Comment #}")
-	assertCompileOutput(t, raw, "SELECT {# test comment#}* FROM BLAH")
-	assertCompileOutput(t, raw, "SELECT {# test \n\n\ttest\n\ncomment#}* FROM BLAH")
-}
-
-func TestBasicVariables(t *testing.T) {
-	assertCompileOutput(t, "BLAH", "{{ table_name }}")
-	assertCompileOutput(t, "1", "{{ number_value }}")
-	assertCompileOutput(t, "2", "{{ str_number_value }}")
-
-	const raw = "SELECT * FROM BLAH"
-	assertCompileOutput(t, raw, "SELECT * FROM {{ table_name }}")
-	assertCompileOutput(t, raw, "SELECT * FROM {{table_name}}")
-	assertCompileOutput(t, raw, "SELECT * FROM {{ table_name}}")
-	assertCompileOutput(t, raw, "SELECT * FROM {{table_name }}")
-}
-
-func TestListVariables(t *testing.T) {
-	assertCompileOutput(t, "first option is string", "{{ list_object[0] }}")
-	assertCompileOutput(t, "second option a string too!", "{{ list_object[1] }}")
-	assertCompileOutput(t, "third", "{{ list_object[2] }}")
-}
-
-func TestMapVariables(t *testing.T) {
-	assertCompileOutput(t, "test", "{{ map_object['string'] }}")
-	assertCompileOutput(t, "42", "{{ map_object['key'] }}")
-	assertCompileOutput(t, "test", "{{ map_object.string }}")
-	assertCompileOutput(t, "42", "{{ map_object.key }}")
-}
-
-func TestComplexVariableCombination(t *testing.T) {
-	assertCompileOutput(t, "3", "{{ map_object.nested.number }}")
-	assertCompileOutput(t, "thingy", "{{ list_object[3].blah[0] }}")
-	assertCompileOutput(t, "thingy", "{{ list_object[map_object.nested.number].blah[0] }}")
-	assertCompileOutput(t, "thingy", "{{ list_object[map_object['nested']['number']].blah[0] }}")
-	assertCompileOutput(t, "thingy", "{{ list_object[list_object[4][1]].blah[0] }}")
 }
 
 func compileFromRaw(t *testing.T, raw string) string {
@@ -131,4 +83,14 @@ func assertCompileOutput(t *testing.T, expected, input string) {
 		"Unexpected output from %s",
 		input,
 	)
+}
+
+func parseFile(file *fs.File) error {
+	syntaxTree, err := jinja.Parse(file)
+	if err != nil {
+		return err
+	}
+
+	file.SyntaxTree = syntaxTree
+	return nil
 }

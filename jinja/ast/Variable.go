@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"ddbt/compilerInterface"
@@ -23,7 +22,7 @@ type Variable struct {
 	varType     variableType
 	subVariable *Variable
 
-	argCall         []funcCallArg
+	argCall         funcCallArgs
 	lookupKey       AST
 	isTemplateBlock bool
 }
@@ -34,7 +33,7 @@ func NewVariable(token *lexer.Token) *Variable {
 	return &Variable{
 		token:   token,
 		varType: identVar,
-		argCall: make([]funcCallArg, 0),
+		argCall: make(funcCallArgs, 0),
 	}
 }
 
@@ -66,6 +65,9 @@ func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInte
 	case propertyLookupVar:
 		return v.resolvePropertyLookup(ec)
 
+	case funcCallVar:
+		return v.resolveFunctionCall(ec)
+
 	default:
 		return nil, ec.ErrorAt(v, fmt.Sprintf("unable to resolve variable type %s: not implemented", v.varType))
 	}
@@ -82,7 +84,7 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 		return nil, err
 	}
 	if lookupKey == nil {
-		return nil, ec.ErrorAt(v.lookupKey, fmt.Sprintf("lookup key execution returned nil from %s", reflect.TypeOf(v.lookupKey)))
+		return nil, ec.NilResultFor(v.lookupKey)
 	}
 
 	t := value.Type()
@@ -127,18 +129,48 @@ func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) 
 		return nil, err
 	}
 
-	t := value.Type()
-	switch t {
-	case compilerInterface.MapVal:
-		rtnValue, found := value.MapValue[v.token.Value]
-		if !found {
-			return &compilerInterface.Value{IsUndefined: true}, nil
-		}
-		return rtnValue, nil
-
-	default:
-		return nil, ec.ErrorAt(v, fmt.Sprintf("unable reference by property key in a %s", t))
+	data := value.Properties()
+	if data == nil {
+		return nil, ec.ErrorAt(v, fmt.Sprintf("unable reference by property key in a %s", value.Type()))
 	}
+
+	rtnValue, found := data[v.token.Value]
+	if !found {
+		return &compilerInterface.Value{IsUndefined: true}, nil
+	}
+
+	return rtnValue, nil
+}
+
+func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	value, err := v.subVariable.resolve(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	if value.Type() != compilerInterface.FunctionalVal {
+		return nil, ec.ErrorAt(v.subVariable, fmt.Sprintf("required function to execute, got %s", value.Type()))
+	}
+
+	arguments, err := v.argCall.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	ec.PushState()
+
+	result, err := value.Function(ec, arguments)
+	if err != nil {
+		return nil, err
+	}
+
+	if result == nil {
+		return nil, ec.NilResultFor(v.subVariable)
+	}
+
+	ec.PopState()
+
+	return result, nil
 }
 
 func (v *Variable) String() string {

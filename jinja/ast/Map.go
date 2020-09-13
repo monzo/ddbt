@@ -24,7 +24,21 @@ func (m *Map) Position() lexer.Position {
 }
 
 func (m *Map) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	resultMap := make(map[string]*compilerInterface.Value)
+
+	for key, value := range m.data {
+		result, err := value.Execute(ec)
+		if err != nil {
+			return nil, err
+		}
+		if result == nil {
+			return nil, ec.NilResultFor(value)
+		}
+
+		resultMap[key] = result
+	}
+
+	return &compilerInterface.Value{ValueType: compilerInterface.MapVal, MapValue: resultMap}, nil
 }
 
 func (m *Map) String() string {

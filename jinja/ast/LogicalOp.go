@@ -30,7 +30,58 @@ func (op *LogicalOp) Position() lexer.Position {
 }
 
 func (op *LogicalOp) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	lhs, err := op.lhs.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if lhs == nil {
+		return nil, ec.NilResultFor(op.lhs)
+	}
+
+	rhs, err := op.rhs.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+	if rhs == nil {
+		return nil, ec.NilResultFor(op.rhs)
+	}
+
+	result := false
+
+	switch op.op {
+	case lexer.IsEqualsToken:
+		result = lhs.Equals(rhs)
+
+	case lexer.NotEqualsToken:
+		result = !lhs.Equals(rhs)
+
+	case lexer.LessThanToken, lexer.LessThanEqualsToken, lexer.GreaterThanToken, lexer.GreaterThanEqualsToken:
+		lhsNum, err := lhs.AsNumberValue()
+		if err != nil {
+			return nil, ec.ErrorAt(op.lhs, fmt.Sprintf("%s", err))
+		}
+
+		rhsNum, err := rhs.AsNumberValue()
+		if err != nil {
+			return nil, ec.ErrorAt(op.rhs, fmt.Sprintf("%s", err))
+		}
+
+		switch op.op {
+		case lexer.LessThanToken:
+			result = lhsNum < rhsNum
+		case lexer.LessThanEqualsToken:
+			result = lhsNum <= rhsNum
+		case lexer.GreaterThanToken:
+			result = lhsNum > rhsNum
+		case lexer.GreaterThanEqualsToken:
+			result = lhsNum >= rhsNum
+		}
+
+	default:
+		return nil, ec.ErrorAt(op, fmt.Sprintf("Unable to process logical operator `%s`", op.op))
+	}
+
+	return compilerInterface.NewBoolean(result), nil
 }
 
 func (op *LogicalOp) String() string {

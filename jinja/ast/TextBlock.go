@@ -40,3 +40,9 @@ func (tb *TextBlock) TrimPrefixWhitespace() string {
 
 	return tb.value
 }
+
+func (tb *TextBlock) TrimSuffixWhitespace() string {
+	tb.value = strings.TrimRightFunc(tb.value, unicode.IsSpace)
+
+	return tb.value
+}

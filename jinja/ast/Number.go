@@ -26,7 +26,7 @@ func (n *Number) Position() lexer.Position {
 }
 
 func (n *Number) Execute(_ compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return &compilerInterface.Value{NumberValue: n.number}, nil
+	return compilerInterface.NewNumber(n.number), nil
 }
 
 func (n *Number) String() string {

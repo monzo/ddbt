@@ -11,7 +11,7 @@ import (
 type FunctionCall struct {
 	position  lexer.Position
 	name      string
-	arguments []funcCallArg
+	arguments funcCallArgs
 }
 
 type funcCallArg struct {
@@ -19,13 +19,15 @@ type funcCallArg struct {
 	arg  AST
 }
 
+type funcCallArgs []funcCallArg
+
 var _ AST = &FunctionCall{}
 
 func NewFunctionCall(token *lexer.Token, funcName string) *FunctionCall {
 	return &FunctionCall{
 		position:  token.Start,
 		name:      funcName,
-		arguments: make([]funcCallArg, 0),
+		arguments: make(funcCallArgs, 0),
 	}
 }
 
@@ -58,4 +60,23 @@ func (fc *FunctionCall) String() string {
 
 func (fc *FunctionCall) AddArgument(argName string, node AST) {
 	fc.arguments = append(fc.arguments, funcCallArg{argName, node})
+}
+
+func (fca funcCallArgs) Execute(ec compilerInterface.ExecutionContext) (compilerInterface.Arguments, error) {
+	arguments := make(compilerInterface.Arguments, 0, len(fca))
+
+	for _, arg := range fca {
+		result, err := arg.arg.Execute(ec)
+		if err != nil {
+			return nil, err
+		}
+
+		if result == nil {
+			return nil, ec.NilResultFor(arg.arg)
+		}
+
+		arguments = append(arguments, compilerInterface.Argument{Name: arg.name, Value: result})
+	}
+
+	return arguments, nil
 }

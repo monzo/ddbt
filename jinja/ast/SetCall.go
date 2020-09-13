@@ -28,7 +28,18 @@ func (sc *SetCall) Position() lexer.Position {
 }
 
 func (sc *SetCall) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	result, err := sc.condition.Execute(ec)
+	if err != nil {
+		return nil, err
+	}
+
+	if result == nil {
+		return nil, ec.NilResultFor(sc.condition)
+	}
+
+	ec.SetVariable(sc.variableToSet, result)
+
+	return &compilerInterface.Value{IsUndefined: true}, nil
 }
 
 func (sc *SetCall) String() string {

@@ -18,6 +18,7 @@ type parser struct {
 	nextTokenIndex int
 
 	trimFollowingWhitespace bool
+	previousTextBlock       *ast.TextBlock
 }
 
 func Parse(file *fs.File) (ast.AST, error) {
@@ -134,6 +135,7 @@ func (p *parser) parse() (ast.AST, error) {
 
 	case lexer.TextToken:
 		textToken := ast.NewTextBlock(p.next())
+
 		if p.trimFollowingWhitespace {
 			result := textToken.TrimPrefixWhitespace()
 
@@ -145,12 +147,19 @@ func (p *parser) parse() (ast.AST, error) {
 			p.trimFollowingWhitespace = false // If here we have non-whitespace characters
 		}
 
+		p.previousTextBlock = textToken
+
 		return textToken, nil
 
 	case lexer.ExpressionBlockOpen, lexer.ExpressionBlockOpenTrim:
+		p.trimFollowingWhitespace = false
 		return p.parseExpressionBlock()
 
 	case lexer.TemplateBlockOpen:
+		// Reset our trim
+		p.trimFollowingWhitespace = false
+		p.previousTextBlock = nil
+
 		return p.parseTemplateBlock()
 
 	default:
@@ -671,7 +680,10 @@ func (p *parser) parseBodyUntilAtom(endAtom string, parentNode ast.BodyHoldingAS
 
 func (p *parser) parseExpressionBlockOpen() error {
 	if p.peekIs(lexer.ExpressionBlockOpenTrim) {
-		// FIXME: trim previous whitespace
+		if p.previousTextBlock != nil {
+			p.previousTextBlock.TrimSuffixWhitespace()
+		}
+
 		_ = p.next()
 	} else {
 		_, err := p.expectedAndConsumeValue(lexer.ExpressionBlockOpen)
@@ -679,6 +691,9 @@ func (p *parser) parseExpressionBlockOpen() error {
 			return err
 		}
 	}
+
+	// The previous block is no longer a text block
+	p.previousTextBlock = nil
 
 	return nil
 }
@@ -691,6 +706,8 @@ func (p *parser) parseExpressionBlockClose() error {
 		if err != nil {
 			return err
 		}
+
+		p.trimFollowingWhitespace = false
 	}
 
 	return nil
