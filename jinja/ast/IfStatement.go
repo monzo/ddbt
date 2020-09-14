@@ -45,7 +45,7 @@ func (is *IfStatement) Execute(ec compilerInterface.ExecutionContext) (*compiler
 		return is.elseBody.Execute(ec)
 	}
 
-	return &compilerInterface.Value{IsUndefined: true}, nil
+	return compilerInterface.NewUndefined(), nil
 }
 
 func (is *IfStatement) String() string {

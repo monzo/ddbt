@@ -49,6 +49,10 @@ func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (*compilerInte
 		return nil, ec.NilResultFor(fl.list)
 	}
 
+	if list.ValueType == compilerInterface.ReturnVal {
+		list = list.ReturnValue
+	}
+
 	switch list.Type() {
 	case compilerInterface.ListVal:
 		return fl.executeForList(list.ListValue, ec)
@@ -61,16 +65,17 @@ func (fl *ForLoop) Execute(ec compilerInterface.ExecutionContext) (*compilerInte
 	}
 }
 
-func (fl *ForLoop) executeForList(list []*compilerInterface.Value, ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+func (fl *ForLoop) executeForList(list []*compilerInterface.Value, parentEC compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	var builder strings.Builder
 
 	for index, value := range list {
-		ec.PushState()
+		ec := parentEC.PushState()
 
 		// Set the loop variables
 		ec.SetVariable("loop", &compilerInterface.Value{
 			MapValue: map[string]*compilerInterface.Value{
-				"last": compilerInterface.NewBoolean(index == (len(list) - 1)),
+				"index": compilerInterface.NewNumber(float64(index + 1)), // Python loops start at 1!!!
+				"last":  compilerInterface.NewBoolean(index == (len(list) - 1)),
 			},
 		})
 		if fl.keyItrName != "" {
@@ -86,14 +91,12 @@ func (fl *ForLoop) executeForList(list []*compilerInterface.Value, ec compilerIn
 		if err := writeValue(ec, fl.body, &builder, result); err != nil {
 			return nil, err
 		}
-
-		ec.PopState()
 	}
 
 	return &compilerInterface.Value{StringValue: builder.String()}, nil
 }
 
-func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, parentEC compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
 	var builder strings.Builder
 
 	num := 0
@@ -106,7 +109,7 @@ func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, ec co
 	sort.Strings(keys)
 
 	for index, key := range keys {
-		ec.PushState()
+		ec := parentEC.PushState()
 
 		// Set the loop variables
 		ec.SetVariable("loop", &compilerInterface.Value{
@@ -129,7 +132,6 @@ func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, ec co
 			return nil, err
 		}
 
-		ec.PopState()
 		num++
 	}
 

@@ -19,6 +19,7 @@ const (
 	blankRune     = '-'
 
 	labelColumnWidth = 35
+	rightColumnWidth = 30
 	refreshRate      = 16 * time.Millisecond // 60 fps!
 )
 
@@ -153,11 +154,15 @@ func (pb *ProgressBar) String() string {
 
 	// Display our operations per second
 	builder.WriteString(fmt.Sprintf(
-		" %5.0f op/s",
+		" %6.0f op/s",
 		(float64(completed)*1e9)/float64(duration.Nanoseconds()),
 	))
 
 	rightEdge := builder.String()
+
+	if rightColumnWidth > len(rightEdge) {
+		rightEdge = strings.Repeat(" ", rightColumnWidth-len(rightEdge)) + rightEdge
+	}
 	builder.Reset()
 
 	// Draw the left hand edge

@@ -27,15 +27,14 @@ func (cb *CallBlock) Position() lexer.Position {
 	return cb.position
 }
 
-func (cb *CallBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	ec.PushState()
-	defer ec.PopState()
+func (cb *CallBlock) Execute(parentEC compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	ec := parentEC.PushState()
 
 	// Set it so the body AST can be executed using the caller function
 	ec.SetVariable(
 		"caller",
-		compilerInterface.NewFunction(func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-			return cb.body.Execute(ec)
+		compilerInterface.NewFunction(func(sec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+			return cb.body.Execute(sec)
 		}),
 	)
 

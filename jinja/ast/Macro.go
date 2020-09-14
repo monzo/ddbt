@@ -39,9 +39,10 @@ func (m *Macro) Position() lexer.Position {
 }
 
 func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	ec.SetVariable(
+	ec.RegisterMacro(
 		m.name,
-		compilerInterface.NewFunction(func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		ec,
+		func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 			if len(args) < len(m.parameters)-m.numOptionalParams {
 				return nil, ec.ErrorAt(caller, fmt.Sprintf("%d args required, got %d", len(m.parameters)-m.numOptionalParams, len(args)))
 			}
@@ -88,7 +89,7 @@ func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (*compilerInterfa
 			}
 
 			return m.body.Execute(ec)
-		}),
+		},
 	)
 
 	return &compilerInterface.Value{IsUndefined: true}, nil

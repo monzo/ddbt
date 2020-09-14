@@ -7,7 +7,6 @@ import (
 
 	"ddbt/compiler"
 	"ddbt/fs"
-	"ddbt/jinja"
 	"ddbt/utils"
 )
 
@@ -18,7 +17,9 @@ func main() {
 	}
 
 	parseFiles(fileSystem)
-	compileFiles(fileSystem)
+	gc := compiler.NewGlobalContext(fileSystem)
+	compileMacros(fileSystem, gc)
+	compileFiles(fileSystem, gc)
 }
 
 func parseFiles(fileSystem *fs.FileSystem) {
@@ -28,7 +29,7 @@ func parseFiles(fileSystem *fs.FileSystem) {
 	utils.ProcessFiles(
 		fileSystem.AllFiles(),
 		func(file *fs.File) {
-			if err := parseFile(file); err != nil {
+			if err := compiler.ParseFile(file); err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to parse %s %s: %s\n", file.Type, file.Name, err)
 				os.Exit(1)
@@ -38,24 +39,32 @@ func parseFiles(fileSystem *fs.FileSystem) {
 	)
 }
 
-func parseFile(file *fs.File) error {
-	syntaxTree, err := jinja.Parse(file)
-	if err != nil {
-		return err
-	}
+func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
+	pb := utils.NewProgressBar("📚 Compiling Macros", len(fileSystem.Macros()))
+	defer pb.Stop()
 
-	file.SyntaxTree = syntaxTree
-	return nil
+	utils.ProcessFiles(
+		fileSystem.Macros(),
+		func(file *fs.File) {
+			_, err := compiler.CompileModel(file, gc)
+			if err != nil {
+				pb.Stop()
+				fmt.Printf("❌ Unable to compile %s %s: %s\n", file.Type, file.Name, err)
+				os.Exit(1)
+			}
+			pb.Increment()
+		},
+	)
 }
 
-func compileFiles(fileSystem *fs.FileSystem) {
+func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("📝 Compiling Models", len(fileSystem.Models()))
 	defer pb.Stop()
 
 	utils.ProcessFiles(
 		fileSystem.Models(),
 		func(file *fs.File) {
-			_, err := compiler.CompileModel(file)
+			_, err := compiler.CompileModel(file, gc)
 			if err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to compile %s %s: %s\n", file.Type, file.Name, err)

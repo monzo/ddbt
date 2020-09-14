@@ -375,6 +375,15 @@ func TestMathUniaryOperators(t *testing.T) {
 	assertCompileOutput(t, "-1", `{{ -4 - -3 }}`)
 }
 
+func TestOperatorPrecedence(t *testing.T) {
+	assertCompileOutput(t, "pass",
+		`{% if (not is_incremental() or config.get('materialized') != 'incremental') -%}
+				pass
+				{%- else -%}
+				fail
+				{%- endif -%}`)
+}
+
 func TestStringConcatOperator(t *testing.T) {
 	assertCompileOutput(t, "hello world",
 		`{% set endWord = "ld" -%}

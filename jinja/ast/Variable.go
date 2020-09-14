@@ -42,7 +42,7 @@ func (v *Variable) Position() lexer.Position {
 }
 
 func (v *Variable) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	variable, err := v.resolve(ec)
+	variable, err := v.resolve(ec, false)
 	if err != nil {
 		return nil, err
 	}
@@ -54,16 +54,16 @@ func (v *Variable) Execute(ec compilerInterface.ExecutionContext) (*compilerInte
 	}
 }
 
-func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+func (v *Variable) resolve(ec compilerInterface.ExecutionContext, isForFunctionCall bool) (*compilerInterface.Value, error) {
 	switch v.varType {
 	case identVar:
 		return ec.GetVariable(v.token.Value), nil
 
 	case indexLookupVar:
-		return v.resolveIndexLookup(ec)
+		return v.resolveIndexLookup(ec, isForFunctionCall)
 
 	case propertyLookupVar:
-		return v.resolvePropertyLookup(ec)
+		return v.resolvePropertyLookup(ec, isForFunctionCall)
 
 	case funcCallVar:
 		return v.resolveFunctionCall(ec)
@@ -73,8 +73,8 @@ func (v *Variable) resolve(ec compilerInterface.ExecutionContext) (*compilerInte
 	}
 }
 
-func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	value, err := v.subVariable.resolve(ec)
+func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext, isForFunctionCall bool) (*compilerInterface.Value, error) {
+	value, err := v.subVariable.resolve(ec, false)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,14 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 
 		rtnValue, found := value.MapValue[lookupKey.StringValue]
 		if !found {
-			return &compilerInterface.Value{IsUndefined: true}, nil
+			if isForFunctionCall && lookupKey.StringValue == "items" {
+				// If we're asking for the items of a map, return the map back
+				return compilerInterface.NewFunction(func(_ compilerInterface.ExecutionContext, _ compilerInterface.AST, _ compilerInterface.Arguments) (*compilerInterface.Value, error) {
+					return value, nil
+				}), nil
+			} else {
+				return &compilerInterface.Value{IsUndefined: true}, nil
+			}
 		}
 		return rtnValue, nil
 
@@ -123,8 +130,8 @@ func (v *Variable) resolveIndexLookup(ec compilerInterface.ExecutionContext) (*c
 	}
 }
 
-func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	value, err := v.subVariable.resolve(ec)
+func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext, isForFunctionCall bool) (*compilerInterface.Value, error) {
+	value, err := v.subVariable.resolve(ec, isForFunctionCall)
 	if err != nil {
 		return nil, err
 	}
@@ -136,19 +143,26 @@ func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext) 
 
 	rtnValue, found := data[v.token.Value]
 	if !found {
-		return &compilerInterface.Value{IsUndefined: true}, nil
+		if isForFunctionCall && v.token.Value == "items" {
+			// If we're asking for the items of a map, return the map back
+			return compilerInterface.NewFunction(func(_ compilerInterface.ExecutionContext, _ compilerInterface.AST, _ compilerInterface.Arguments) (*compilerInterface.Value, error) {
+				return value, nil
+			}), nil
+		} else {
+			return &compilerInterface.Value{IsUndefined: true}, nil
+		}
 	}
 
 	return rtnValue, nil
 }
 
 func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	value, err := v.subVariable.resolve(ec)
+	value, err := v.subVariable.resolve(ec, true)
 	if err != nil {
 		return nil, err
 	}
 
-	if value.Type() != compilerInterface.FunctionalVal {
+	if value.Type() != compilerInterface.FunctionalVal && value.Function == nil {
 		return nil, ec.ErrorAt(v.subVariable, fmt.Sprintf("required function to execute, got %s", value.Type()))
 	}
 
@@ -157,9 +171,7 @@ func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*
 		return nil, err
 	}
 
-	ec.PushState()
-
-	result, err := value.Function(ec, v, arguments)
+	result, err := value.Function(ec.PushState(), v, arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +179,6 @@ func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*
 	if result == nil {
 		return nil, ec.NilResultFor(v.subVariable)
 	}
-
-	ec.PopState()
 
 	return result, nil
 }

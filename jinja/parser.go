@@ -36,7 +36,7 @@ func Parse(file *fs.File) (ast.AST, error) {
 	}
 
 	// TODO: Change tokens into a channel and lex the file async
-	tokens, err := lexer.LexFile(reader)
+	tokens, err := lexer.LexFile(file.Path, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (p *parser) peekIs(tokenType lexer.TokenType) bool {
 // Creates a parse error with the location information
 func (p *parser) errorAt(atToken *lexer.Token, error string) error {
 	return errors.New(
-		fmt.Sprintf("%s at %d:%d", error, atToken.Start.Row, atToken.Start.Column),
+		fmt.Sprintf("%s at %s:%d:%d", error, atToken.Start.File, atToken.Start.Row, atToken.Start.Column),
 	)
 }
 
@@ -259,7 +259,7 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 			if defaultValue.Type != lexer.StringToken &&
 				defaultValue.Type != lexer.NumberToken &&
 				defaultValue.Type != lexer.TrueToken && defaultValue.Type != lexer.FalseToken &&
-				!(defaultValue.Type == lexer.IdentToken && defaultValue.Value == "None") {
+				defaultValue.Type != lexer.NoneToken {
 				return nil, p.errorAt(
 					defaultValue,
 					fmt.Sprintf("Expected string, number, boolean or `None` - got: %s", defaultValue.Type),
@@ -416,6 +416,9 @@ func (p *parser) parseValue() (ast.AST, error) {
 	} else if p.peekIs(lexer.NullToken) {
 		statement = ast.NewNullValue(p.next())
 
+	} else if p.peekIs(lexer.NoneToken) {
+		statement = ast.NewNoneValue(p.next())
+
 	} else if p.peekIs(lexer.TrueToken) || p.peekIs(lexer.FalseToken) {
 		statement = ast.NewBoolValue(p.next())
 
@@ -440,6 +443,15 @@ func (p *parser) parseValue() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+		notToken := p.next()
+
+		sub, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+
+		statement = ast.NewNotOperator(notToken, sub)
 
 	} else {
 		statement, err = p.parseVariable(nil)
@@ -794,7 +806,7 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
 		notToken := p.next()
 
-		sub, err := p.parseCondition()
+		sub, err := p.parseValue()
 		if err != nil {
 			return nil, err
 		}
@@ -823,24 +835,37 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "is" {
 		isToken := p.next() // consume the "is"
 
-		ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
-		if err != nil {
-			return nil, err
-		}
-
-		if ident.Value == "not" {
-			ident, err = p.expectedAndConsumeValue(lexer.IdentToken)
+		value := "none"
+		if p.peekIs(lexer.NoneToken) {
+			p.next()
+		} else {
+			ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
 			if err != nil {
 				return nil, err
 			}
-			ident.Value = "not " + ident.Value
+
+			value = ident.Value
 		}
 
-		switch ident.Value {
+		if value == "not" {
+			if p.peekIs(lexer.NoneToken) {
+				p.next()
+				value = "not none"
+			} else {
+				ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
+				if err != nil {
+					return nil, err
+				}
+
+				value = "not " + ident.Value
+			}
+		}
+
+		switch value {
 		case "none", "defined", "not none", "not defined":
-			condition = ast.NewDefineCheck(isToken, condition, ident.Value)
+			condition = ast.NewDefineCheck(isToken, condition, value)
 		default:
-			return nil, p.errorAt(ident, fmt.Sprintf("Expected `none` or `defined` got `%s`", ident.Value))
+			return nil, p.errorAt(isToken, fmt.Sprintf("Expected `none` or `defined` got `%s`", value))
 		}
 
 	}

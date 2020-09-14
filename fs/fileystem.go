@@ -3,6 +3,7 @@ package fs
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,11 @@ func ReadFileSystem() (*FileSystem, error) {
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
 	}
+
+	// FIXME: disabled for a bit
+	//if err := fs.scanDBTModuleMacros(); err != nil {
+	//	return nil, err
+	//}
 
 	if err := fs.scanDirectory("./macros/", MacroFile); err != nil {
 		return nil, err
@@ -55,6 +61,28 @@ func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 	}
 
 	return fs, nil
+}
+
+// Scan any macros in our dbt modules folder
+func (fs *FileSystem) scanDBTModuleMacros() error {
+	files, err := ioutil.ReadDir("./dbt_modules")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			if err := fs.scanDirectory("./dbt_modules/"+f.Name()+"/macros", MacroFile); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (fs *FileSystem) scanDirectory(path string, fileType FileType) error {

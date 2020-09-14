@@ -46,7 +46,7 @@ func (fc *FunctionCall) Execute(ec compilerInterface.ExecutionContext) (*compile
 		return nil, ec.ErrorAt(fc, fmt.Sprintf("function `%s` not found", fc.name))
 	}
 
-	if function.Type() != compilerInterface.FunctionalVal {
+	if function.Type() != compilerInterface.FunctionalVal && function.Function == nil {
 		return nil, ec.ErrorAt(fc, fmt.Sprintf("expected `%s` to be a function, got %s", fc.name, function.Type()))
 	}
 
@@ -54,12 +54,10 @@ func (fc *FunctionCall) Execute(ec compilerInterface.ExecutionContext) (*compile
 		return nil, ec.ErrorAt(fc, "function is nil!")
 	}
 
-	ec.PushState()
-	result, err := function.Function(ec, fc, args)
+	result, err := function.Function(ec.PushState(), fc, args)
 	if err != nil {
 		return nil, err
 	}
-	ec.PopState()
 
 	return result, err
 }

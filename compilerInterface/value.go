@@ -20,6 +20,7 @@ const (
 	MapVal        ValueType = "Map"
 	ListVal       ValueType = "List"
 	FunctionalVal ValueType = "Function"
+	ReturnVal     ValueType = "ReturnVal" // marker to shortcut the rest of the file
 )
 
 type Value struct {
@@ -32,6 +33,7 @@ type Value struct {
 	Function     FunctionDef
 	IsUndefined  bool
 	IsNull       bool
+	ReturnValue  *Value
 }
 
 func NewBoolean(value bool) *Value {
@@ -46,10 +48,28 @@ func NewNumber(value float64) *Value {
 	return &Value{ValueType: NumberVal, NumberValue: value}
 }
 
+func NewMap(data map[string]*Value) *Value {
+	return &Value{ValueType: MapVal, MapValue: data}
+}
+
 func NewFunction(f FunctionDef) *Value {
 	return &Value{
 		ValueType: FunctionalVal,
 		Function:  f,
+	}
+}
+
+func NewUndefined() *Value {
+	return &Value{
+		ValueType:   Undefined,
+		IsUndefined: true,
+	}
+}
+
+func NewReturnValue(value *Value) *Value {
+	return &Value{
+		ValueType:   ReturnVal,
+		ReturnValue: value,
 	}
 }
 
@@ -102,6 +122,9 @@ func (v *Value) Properties() map[string]*Value {
 			"items": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) { return v, nil }),
 		}
 
+	case ReturnVal:
+		return v.ReturnValue.Properties()
+
 	default:
 		return nil
 	}
@@ -126,6 +149,9 @@ func (v *Value) TruthyValue() bool {
 
 	case NullVal, Undefined:
 		return false
+
+	case ReturnVal:
+		return v.ReturnValue.TruthyValue()
 
 	default:
 		panic("Unable to truthy " + v.Type())
@@ -156,6 +182,9 @@ func (v *Value) AsStringValue() string {
 	case NullVal, Undefined:
 		return ""
 
+	case ReturnVal:
+		return v.ReturnValue.AsStringValue()
+
 	default:
 		panic("Unable to truthy " + v.Type())
 	}
@@ -179,13 +208,24 @@ func (v *Value) AsNumberValue() (float64, error) {
 	case NullVal, Undefined:
 		return 0, nil
 
+	case ReturnVal:
+		return v.ReturnValue.AsNumberValue()
+
 	default:
 		return 0, errors.New(fmt.Sprintf("unable to convert %s to number", v.Type()))
 	}
 }
 
 func (v *Value) Equals(other *Value) bool {
+	if v.ValueType == ReturnVal {
+		return v.ReturnValue.Equals(other)
+	}
+
 	vType := v.Type()
+
+	if other.ValueType == ReturnVal {
+		other = other.ReturnValue
+	}
 
 	if vType != other.Type() {
 		return false
@@ -261,12 +301,11 @@ func ValueFromToken(t *lexer.Token) (*Value, error) {
 	case lexer.NullToken:
 		return &Value{ValueType: NullVal, IsNull: true}, nil
 
+	case lexer.NoneToken:
+		return NewUndefined(), nil
+
 	case lexer.IdentToken:
-		if t.Value == "none" {
-			return &Value{ValueType: Undefined, IsUndefined: true}, nil
-		} else {
-			return nil, errors.New("unable to convert ident to value: " + t.Value)
-		}
+		return nil, errors.New("unable to convert ident to value: " + t.Value)
 
 	default:
 		return nil, errors.New(fmt.Sprintf("unable to convert %s to value", t.Type))

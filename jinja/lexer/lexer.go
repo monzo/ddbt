@@ -26,10 +26,10 @@ type lexer struct {
 	inBlock bool
 }
 
-func LexFile(file io.Reader) ([]*Token, error) {
+func LexFile(path string, file io.Reader) ([]*Token, error) {
 	lexer := &lexer{
 		reader:       bufio.NewReader(file),
-		runePosition: Position{0, 1},
+		runePosition: Position{path, 0, 1},
 	}
 
 	// Read the first character into the nextRune buffer
@@ -492,6 +492,9 @@ func (l *lexer) readIdentifierToken() (*Token, error) {
 		return l.newToken(FalseToken), nil
 	case "null":
 		return l.newToken(NullToken), nil
+
+	case "none":
+		return l.newToken(NoneToken), nil
 
 	default:
 		return l.newTokenWithValue(IdentToken, value), nil

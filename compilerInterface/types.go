@@ -8,8 +8,8 @@ type ExecutionContext interface {
 
 	ErrorAt(part AST, error string) error
 	NilResultFor(part AST) error
-	PushState()
-	PopState()
+	PushState() ExecutionContext
+	RegisterMacro(name string, ec ExecutionContext, function FunctionDef)
 }
 
 type AST interface {

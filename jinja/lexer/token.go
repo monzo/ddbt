@@ -3,6 +3,7 @@ package lexer
 import "fmt"
 
 type Position struct {
+	File   string
 	Column int
 	Row    int
 }
@@ -52,6 +53,7 @@ const (
 	TrueToken              = "TRUE"
 	FalseToken             = "FALSE"
 	NullToken              = "NULL"
+	NoneToken              = "None"
 )
 
 type Token struct {

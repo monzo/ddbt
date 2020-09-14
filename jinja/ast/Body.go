@@ -41,9 +41,15 @@ func (b *Body) Execute(ec compilerInterface.ExecutionContext) (*compilerInterfac
 		if err := writeValue(ec, part, &builder, result); err != nil {
 			return nil, err
 		}
+
+		if result.ValueType == compilerInterface.ReturnVal {
+			return result, nil
+		}
 	}
 
-	return &compilerInterface.Value{StringValue: builder.String()}, nil
+	value := compilerInterface.NewString(builder.String())
+
+	return value, nil
 }
 
 func (b *Body) String() string {
@@ -68,11 +74,40 @@ func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AS
 
 	t := value.Type()
 	switch t {
-	case compilerInterface.StringVal:
-		builder.WriteString(value.StringValue)
+	case compilerInterface.StringVal, compilerInterface.NumberVal, compilerInterface.BooleanValue, compilerInterface.ReturnVal:
+		builder.WriteString(value.AsStringValue())
 
-	case compilerInterface.NumberVal:
-		builder.WriteString(fmt.Sprintf("%g", value.NumberValue))
+	case compilerInterface.ListVal:
+		builder.WriteRune('[')
+		for i, item := range value.ListValue {
+			if i > 0 {
+				builder.WriteString(", ")
+			}
+
+			if err := writeValue(ec, part, builder, item); err != nil {
+				return err
+			}
+		}
+		builder.WriteRune(']')
+
+	case compilerInterface.MapVal:
+		builder.WriteRune('{')
+		i := 0
+		for key, item := range value.MapValue {
+			if i > 0 {
+				builder.WriteString(", ")
+			}
+
+			builder.WriteRune('"')
+			builder.WriteString(key)
+			builder.WriteString("\": ")
+
+			if err := writeValue(ec, part, builder, item); err != nil {
+				return err
+			}
+			i++
+		}
+		builder.WriteRune('}')
 
 	case compilerInterface.Undefined, compilerInterface.NullVal:
 	// no-op as we can consume these without effect
