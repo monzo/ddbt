@@ -18,7 +18,11 @@ func main() {
 		log.Fatalf("Unable to read filesystem: %s", err)
 	}
 
-	cfg := config.Read()
+	cfg, err := config.Read()
+	if err != nil {
+		fmt.Printf("❌ Unable to load config: %s\n", err)
+		os.Exit(1)
+	}
 
 	parseFiles(fileSystem)
 	gc := compiler.NewGlobalContext(cfg, fileSystem)

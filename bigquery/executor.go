@@ -12,11 +12,10 @@ import (
 )
 
 func Run(f *fs.File) error {
-	buildFinalQuery(f)
-
 	return errors.New(fmt.Sprintf(
-		"Unable to run %s as BigQuery interface not implemented",
+		"Unable to run %s as BigQuery interface not implemented\n\n%s",
 		f.Name,
+		buildFinalQuery(f),
 	))
 }
 
