@@ -66,7 +66,7 @@ func compileFromRaw(t *testing.T, raw string) string {
 
 	// Create the execution context
 	gc := compiler.NewGlobalContext(fileSystem)
-	ec := compiler.NewExecutionContext(gc)
+	ec := compiler.NewExecutionContext(file, fileSystem, gc)
 	ec.SetVariable("config", file.ConfigObject())
 	for key, value := range testVariables {
 		ec.SetVariable(key, value)

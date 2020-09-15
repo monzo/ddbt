@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ddbt/compilerInterface"
+	"ddbt/fs"
 )
 
 var builtInFunctions = map[string]compilerInterface.FunctionDef{
@@ -98,17 +99,7 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 
 	"project_name": nil, // Note this is defined in the global context
 
-	"ref": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-		// FIXME: implement correctly
-		values, err := requiredArgs(ec, caller, args, "ref", compilerInterface.StringVal)
-		if err != nil {
-			return nil, err
-		}
-
-		return compilerInterface.NewString(
-			"FIXME-PROJECT.FIXME-DATASET." + values[0].AsStringValue(),
-		), nil
-	},
+	"ref": refFunction,
 
 	"return": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 		if len(args) != 1 {
@@ -179,17 +170,7 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 	},
 
 	// Our specific functions
-	"indirect_ref": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-		// FIXME: implement correctly
-		values, err := requiredArgs(ec, caller, args, "ref", compilerInterface.StringVal)
-		if err != nil {
-			return nil, err
-		}
-
-		return compilerInterface.NewString(
-			"FIXME-PROJECT.FIXME-DATASET." + values[0].AsStringValue(),
-		), nil
-	},
+	"indirect_ref": refFunction,
 
 	// DDBT Debugging function - Allows removing of macro's from models without completely removing them
 	"noop": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
@@ -254,6 +235,24 @@ func noopMethod() compilerInterface.FunctionDef {
 	return func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 		return compilerInterface.NewUndefined(), nil
 	}
+}
+
+func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+	// FIXME: implement correctly
+	values, err := requiredArgs(ec, caller, args, "ref", compilerInterface.StringVal)
+	if err != nil {
+		return nil, err
+	}
+
+	modelName := values[0].AsStringValue()
+
+	if err := ec.RegisterUpstream(modelName, fs.ModelFile); err != nil {
+		return nil, ec.ErrorAt(caller, err.Error())
+	}
+
+	return compilerInterface.NewString(
+		"FIXME-PROJECT.FIXME-DATASET." + modelName,
+	), nil
 }
 
 type funcMap = map[string]compilerInterface.FunctionDef

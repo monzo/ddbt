@@ -22,6 +22,7 @@ type GlobalContext struct {
 type macroDef struct {
 	ec       compilerInterface.ExecutionContext
 	function compilerInterface.FunctionDef
+	fileName string
 }
 
 var _ compilerInterface.ExecutionContext = &GlobalContext{}
@@ -112,15 +113,15 @@ func (g *GlobalContext) GetVariable(name string) *compilerInterface.Value {
 }
 
 func (g *GlobalContext) ErrorAt(part compilerInterface.AST, error string) error {
-	panic("implement me")
+	panic("ErrorAt not implemented for global context")
 }
 
 func (g *GlobalContext) NilResultFor(part compilerInterface.AST) error {
-	panic("implement me")
+	panic("NilResultFor not implemented for global context")
 }
 
 func (g *GlobalContext) PushState() compilerInterface.ExecutionContext {
-	panic("implement me")
+	panic("PushState not implemented for global context")
 }
 
 func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, error) {
@@ -137,7 +138,7 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 				return nil, err
 			}
 
-			if _, err := CompileModel(file, g); err != nil {
+			if err := CompileModel(file, g); err != nil {
 				return nil, err
 			}
 
@@ -157,6 +158,10 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 	}
 
 	return func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		if err := ec.RegisterUpstream(macro.fileName, fs.MacroFile); err != nil {
+			return nil, ec.ErrorAt(caller, err.Error())
+		}
+
 		// Note: we override the ExecutionContext with that from the original macro file
 		//       but keep the caller reference
 		newEC := macro.ec.PushState()
@@ -173,5 +178,14 @@ func (g *GlobalContext) RegisterMacro(name string, ec compilerInterface.Executio
 	g.macros[name] = &macroDef{
 		ec:       ec,
 		function: function,
+		fileName: ec.FileName(),
 	}
+}
+
+func (g *GlobalContext) RegisterUpstream(name string, fileType string) error {
+	panic("RegisterUpstream not implemented for global context")
+}
+
+func (g *GlobalContext) FileName() string {
+	panic("FileName not implemented for global context")
 }

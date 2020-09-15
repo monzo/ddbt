@@ -7,9 +7,12 @@ import (
 	"sync"
 
 	"ddbt/compilerInterface"
+	"ddbt/fs"
 )
 
 type ExecutionContext struct {
+	file           *fs.File
+	fileSystem     *fs.FileSystem
 	varaiblesMutex sync.RWMutex
 	variables      map[string]*compilerInterface.Value
 	states         []map[string]*compilerInterface.Value
@@ -19,8 +22,10 @@ type ExecutionContext struct {
 // Ensure our execution context matches the interface in the AST package
 var _ compilerInterface.ExecutionContext = &ExecutionContext{}
 
-func NewExecutionContext(parent compilerInterface.ExecutionContext) *ExecutionContext {
+func NewExecutionContext(file *fs.File, fileSystem *fs.FileSystem, parent compilerInterface.ExecutionContext) *ExecutionContext {
 	return &ExecutionContext{
+		file:          file,
+		fileSystem:    fileSystem,
 		variables:     make(map[string]*compilerInterface.Value),
 		parentContext: parent,
 	}
@@ -63,5 +68,31 @@ func (e *ExecutionContext) NilResultFor(part compilerInterface.AST) error {
 }
 
 func (e *ExecutionContext) PushState() compilerInterface.ExecutionContext {
-	return NewExecutionContext(e)
+	return NewExecutionContext(e.file, e.fileSystem, e)
+}
+
+func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) error {
+	var upstream *fs.File
+
+	switch fileType {
+	case fs.ModelFile:
+		upstream = e.fileSystem.Model(modelName)
+
+	case fs.MacroFile:
+		upstream = e.fileSystem.Macro(modelName)
+
+	default:
+		return errors.New(fmt.Sprintf("unknown file type: %s", fileType))
+	}
+
+	if upstream == nil {
+		return errors.New(fmt.Sprintf("Unable to find model `%s`", modelName))
+	}
+
+	e.file.RecordDependencyOn(upstream)
+	return nil
+}
+
+func (e *ExecutionContext) FileName() string {
+	return e.file.Name
 }

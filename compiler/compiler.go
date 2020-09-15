@@ -23,8 +23,8 @@ func ParseFile(file *fs.File) error {
 	return nil
 }
 
-func CompileModel(file *fs.File, gc *GlobalContext) (string, error) {
-	ec := NewExecutionContext(gc)
+func CompileModel(file *fs.File, gc *GlobalContext) error {
+	ec := NewExecutionContext(file, gc.fileSystem, gc)
 
 	ec.SetVariable("this", compilerInterface.NewMap(map[string]*compilerInterface.Value{
 		"schema": compilerInterface.NewString("FIXME-DATASET"), // FIXME
@@ -36,16 +36,20 @@ func CompileModel(file *fs.File, gc *GlobalContext) (string, error) {
 
 	finalAST, err := file.SyntaxTree.Execute(ec)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if finalAST == nil {
-		return "", errors.New("no AST returned after execution")
+		return errors.New("no AST returned after execution")
 	}
 
 	if finalAST.Type() != compilerInterface.StringVal && finalAST.Type() != compilerInterface.ReturnVal {
-		return "", errors.New("AST did not return a string")
+		return errors.New("AST did not return a string")
 	}
 
-	return finalAST.AsStringValue(), err
+	file.Mutex.Lock()
+	file.CompiledContents = finalAST.AsStringValue()
+	file.Mutex.Unlock()
+
+	return err
 }
