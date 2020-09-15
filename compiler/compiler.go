@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/jinja"
 )
@@ -27,7 +28,7 @@ func CompileModel(file *fs.File, gc *GlobalContext) error {
 	ec := NewExecutionContext(file, gc.fileSystem, gc)
 
 	ec.SetVariable("this", compilerInterface.NewMap(map[string]*compilerInterface.Value{
-		"schema": compilerInterface.NewString("FIXME-DATASET"), // FIXME
+		"schema": compilerInterface.NewString(config.GlobalCfg.Target.DataSet),
 		"table":  compilerInterface.NewString(file.Name),
 		"name":   compilerInterface.NewString(file.Name),
 	}))

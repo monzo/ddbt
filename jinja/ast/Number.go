@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"fmt"
+	"strconv"
 
 	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
@@ -30,5 +30,5 @@ func (n *Number) Execute(_ compilerInterface.ExecutionContext) (*compilerInterfa
 }
 
 func (n *Number) String() string {
-	return fmt.Sprintf("%g", n.number)
+	return strconv.FormatFloat(n.number, 'f', -1, 64)
 }

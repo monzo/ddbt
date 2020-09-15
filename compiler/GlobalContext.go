@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/utils"
 )
@@ -27,7 +28,7 @@ type macroDef struct {
 
 var _ compilerInterface.ExecutionContext = &GlobalContext{}
 
-func NewGlobalContext(fileSystem *fs.FileSystem) *GlobalContext {
+func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalContext {
 	return &GlobalContext{
 		fileSystem: fileSystem,
 		macros:     make(map[string]*macroDef),
@@ -67,17 +68,15 @@ func NewGlobalContext(fileSystem *fs.FileSystem) *GlobalContext {
 			}),
 
 			// https://docs.getdbt.com/reference/dbt-jinja-functions/project_name
-			"project_name": compilerInterface.NewString("PROJECT NAME"), // FIXME
+			"project_name": compilerInterface.NewString(cfg.Name),
 
 			// https://docs.getdbt.com/reference/dbt-jinja-functions/target
 			"target": compilerInterface.NewMap(map[string]*compilerInterface.Value{
-				"name":    compilerInterface.NewString("dev"),
-				"schema":  compilerInterface.NewString("FIXME-DATASET"),
+				"name":    compilerInterface.NewString(cfg.Target.Name),
+				"schema":  compilerInterface.NewString(cfg.Target.DataSet),
 				"type":    compilerInterface.NewString("bigquery"),
 				"threads": compilerInterface.NewNumber(float64(utils.NumberWorkers)),
-				"project": compilerInterface.NewString("FIXME-PROJECT"),
-
-				//"dataset": compilerInterface.NewString("FIXME-DATASET"),
+				"project": compilerInterface.NewString(cfg.Target.ProjectID),
 			}),
 		},
 	}
@@ -124,6 +123,10 @@ func (g *GlobalContext) PushState() compilerInterface.ExecutionContext {
 	panic("PushState not implemented for global context")
 }
 
+func (g *GlobalContext) CopyVariablesInto(_ compilerInterface.ExecutionContext) {
+	// No-op
+}
+
 func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, error) {
 	g.macroMutex.RLock()
 	macro, found := g.macros[name]
@@ -162,9 +165,9 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 			return nil, ec.ErrorAt(caller, err.Error())
 		}
 
-		// Note: we override the ExecutionContext with that from the original macro file
-		//       but keep the caller reference
-		newEC := macro.ec.PushState()
+		newEC := ec.PushState()
+		// Note we copy any varaibles defined within the macro's own file in to the context being executed here too
+		macro.ec.CopyVariablesInto(newEC)
 		newEC.SetVariable("caller", ec.GetVariable("caller"))
 
 		return macro.function(newEC, caller, args)

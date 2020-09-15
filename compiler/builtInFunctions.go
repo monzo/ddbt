@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/fs"
 )
 
@@ -238,7 +239,6 @@ func noopMethod() compilerInterface.FunctionDef {
 }
 
 func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	// FIXME: implement correctly
 	values, err := requiredArgs(ec, caller, args, "ref", compilerInterface.StringVal)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface
 	}
 
 	return compilerInterface.NewString(
-		"FIXME-PROJECT.FIXME-DATASET." + modelName,
+		"`" + config.GlobalCfg.Target.ProjectID + "`.`" + config.GlobalCfg.Target.DataSet + "`.`" + modelName + "`",
 	), nil
 }
 

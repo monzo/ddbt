@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +54,19 @@ func newFile(path string, file os.FileInfo, fileType FileType) *File {
 func (f *File) SetConfig(name string, value *compilerInterface.Value) {
 	f.configMutex.Lock()
 	defer f.configMutex.Unlock()
+
+	f.config[name] = value
+}
+
+func (f *File) GetConfig(name string) *compilerInterface.Value {
+	f.configMutex.RLock()
+	defer f.configMutex.RUnlock()
+
+	if value, found := f.config[name]; found {
+		return value
+	} else {
+		return compilerInterface.NewUndefined()
+	}
 }
 
 func (f *File) ConfigObject() *compilerInterface.Value {
@@ -102,6 +114,12 @@ func (f *File) ConfigObject() *compilerInterface.Value {
 
 			f.SetConfig(arg.Name, arg.Value)
 		}
+
+		if enabledValue := f.GetConfig("enabled").Unwrap(); enabledValue.Type() == compilerInterface.BooleanValue && !enabledValue.BooleanValue {
+			// This model is not enable and should return undefined (this stops the execution of the AST for the model)
+			return compilerInterface.NewReturnValue(compilerInterface.NewUndefined()), nil
+		}
+
 		return compilerInterface.NewUndefined(), nil
 	}
 
@@ -122,43 +140,4 @@ func (f *File) RecordDependencyOn(upstream *File) {
 	upstream.Mutex.Lock()
 	upstream.downstreams[f] = struct{}{}
 	upstream.Mutex.Unlock()
-}
-
-func (f *File) BuildUpstreamDag(depth int, depthMap map[*File]int, downstreams map[*File]struct{}) (largestDepth int, err error) {
-	if _, found := downstreams[f]; found {
-		return 0, errors.New(fmt.Sprintf("circular dependency detected in %s", f.Path))
-	}
-
-	if currentDepth, found := depthMap[f]; found && currentDepth >= depth {
-		// We've already visited this file and it's already recorded at a greater depth means
-		// we can just return now, otherwise we need to re-record this file at a greater depth
-		return currentDepth, nil
-	}
-
-	depthMap[f] = depth
-	largestDepth = depth
-
-	// Copy the downstreams of this model
-	newDownstreams := make(map[*File]struct{})
-	for key := range downstreams {
-		newDownstreams[key] = struct{}{}
-	}
-
-	// add this model to the new downstreams
-	newDownstreams[f] = struct{}{}
-
-	f.Mutex.Lock()
-	defer f.Mutex.Unlock()
-	for upstream := range f.upstreams {
-		foundDepth, err := upstream.BuildUpstreamDag(depth+1, depthMap, newDownstreams)
-		if err != nil {
-			return 0, err
-		}
-
-		if foundDepth > largestDepth {
-			largestDepth = foundDepth
-		}
-	}
-
-	return largestDepth, nil
 }

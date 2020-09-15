@@ -38,10 +38,10 @@ func (m *Macro) Position() lexer.Position {
 	return m.position
 }
 
-func (m *Macro) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	ec.RegisterMacro(
+func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
+	macroEC.RegisterMacro(
 		m.name,
-		ec,
+		macroEC,
 		func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 			if len(args) < len(m.parameters)-m.numOptionalParams {
 				return nil, ec.ErrorAt(caller, fmt.Sprintf("%d args required, got %d", len(m.parameters)-m.numOptionalParams, len(args)))

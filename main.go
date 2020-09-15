@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 
+	"ddbt/bigquery"
 	"ddbt/compiler"
+	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/utils"
 )
@@ -16,23 +18,19 @@ func main() {
 		log.Fatalf("Unable to read filesystem: %s", err)
 	}
 
+	cfg := config.Read()
+
 	parseFiles(fileSystem)
-	gc := compiler.NewGlobalContext(fileSystem)
+	gc := compiler.NewGlobalContext(cfg, fileSystem)
 	compileMacros(fileSystem, gc)
 	compileFiles(fileSystem, gc)
 
 	if len(os.Args) > 1 {
 		modelName := os.Args[1]
 
-		executionOrder := buildGraph(fileSystem, modelName)
+		graph := buildGraph(fileSystem, modelName)
 
-		for depth, files := range executionOrder {
-			fmt.Printf("\nExecution Batch %d\n", depth+1)
-
-			for _, file := range files {
-				fmt.Printf("\t- %s\n", file.Name)
-			}
-		}
+		executeGraph(graph)
 	}
 }
 
@@ -90,7 +88,7 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	)
 }
 
-func buildGraph(fileSystem *fs.FileSystem, modelName string) [][]*fs.File {
+func buildGraph(fileSystem *fs.FileSystem, modelName string) *fs.Graph {
 	pb := utils.NewProgressBar("🕸 Building DAG", 1)
 	defer pb.Stop()
 
@@ -101,28 +99,36 @@ func buildGraph(fileSystem *fs.FileSystem, modelName string) [][]*fs.File {
 		os.Exit(1)
 	}
 
-	// The selected model always has a depth of 0
-	modelDepths := make(map[*fs.File]int)
+	graph := fs.NewGraph()
 
-	// Check the upstreams
-	largestDepth, err := model.BuildUpstreamDag(0, modelDepths, make(map[*fs.File]struct{}))
-	if err != nil {
+	if err := graph.AddTargetNode(model); err != nil {
 		pb.Stop()
 		fmt.Printf("❌ %s\n", err)
 		os.Exit(1)
 	}
-
-	// Build execution order
-	largestDepth += 1 // (account for the fact our range is `0 <= y <= largestDepth`
-	executionOrder := make([][]*fs.File, largestDepth)
-	for i := 0; i < largestDepth; i++ {
-		executionOrder[i] = make([]*fs.File, 0)
-	}
-	for file, depth := range modelDepths {
-		executionOrder[largestDepth-depth-1] = append(executionOrder[largestDepth-depth-1], file)
-	}
-
 	pb.Increment()
 
-	return executionOrder
+	if graph.Len() == 0 {
+		fmt.Printf("❌ Empty DAG generated for model: %s\n", modelName)
+		os.Exit(1)
+	}
+
+	return graph
+}
+
+func executeGraph(graph *fs.Graph) {
+	pb := utils.NewProgressBar("🚀 Executing DAG", graph.Len())
+	defer pb.Stop()
+
+	graph.Execute(func(file *fs.File) {
+		if file.Type == fs.ModelFile {
+			if err := bigquery.Run(file); err != nil {
+				pb.Stop()
+				fmt.Printf("❌ %s\n", err)
+				os.Exit(1)
+			}
+		}
+
+		pb.Increment()
+	}, utils.NumberWorkers)
 }

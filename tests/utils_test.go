@@ -65,7 +65,7 @@ func compileFromRaw(t *testing.T, raw string) string {
 	require.NotNil(t, file.SyntaxTree, "target_model syntax tree is empty!")
 
 	// Create the execution context
-	gc := compiler.NewGlobalContext(fileSystem)
+	gc := compiler.NewGlobalContext(nil, fileSystem)
 	ec := compiler.NewExecutionContext(file, fileSystem, gc)
 	ec.SetVariable("config", file.ConfigObject())
 	for key, value := range testVariables {

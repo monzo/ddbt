@@ -71,6 +71,17 @@ func (e *ExecutionContext) PushState() compilerInterface.ExecutionContext {
 	return NewExecutionContext(e.file, e.fileSystem, e)
 }
 
+func (e *ExecutionContext) CopyVariablesInto(ec compilerInterface.ExecutionContext) {
+	e.parentContext.CopyVariablesInto(ec)
+
+	e.varaiblesMutex.RLock()
+	defer e.varaiblesMutex.RUnlock()
+
+	for key, value := range e.variables {
+		ec.SetVariable(key, value)
+	}
+}
+
 func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) error {
 	var upstream *fs.File
 

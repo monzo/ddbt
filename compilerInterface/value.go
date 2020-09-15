@@ -168,7 +168,7 @@ func (v *Value) AsStringValue() string {
 		}
 
 	case NumberVal:
-		return fmt.Sprintf("%g", v.NumberValue)
+		return strconv.FormatFloat(v.NumberValue, 'f', -1, 64)
 
 	case StringVal:
 		return v.StringValue
@@ -216,6 +216,14 @@ func (v *Value) AsNumberValue() (float64, error) {
 	}
 }
 
+func (v *Value) Unwrap() *Value {
+	if v.ValueType == ReturnVal {
+		return v.ReturnValue
+	} else {
+		return v
+	}
+}
+
 func (v *Value) Equals(other *Value) bool {
 	if v.ValueType == ReturnVal {
 		return v.ReturnValue.Equals(other)
@@ -223,9 +231,7 @@ func (v *Value) Equals(other *Value) bool {
 
 	vType := v.Type()
 
-	if other.ValueType == ReturnVal {
-		other = other.ReturnValue
-	}
+	other = other.Unwrap()
 
 	if vType != other.Type() {
 		return false

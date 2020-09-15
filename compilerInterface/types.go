@@ -9,6 +9,7 @@ type ExecutionContext interface {
 	ErrorAt(part AST, error string) error
 	NilResultFor(part AST) error
 	PushState() ExecutionContext
+	CopyVariablesInto(ec ExecutionContext)
 
 	RegisterMacro(name string, ec ExecutionContext, function FunctionDef)
 	RegisterUpstream(name string, fileType string) error
