@@ -74,7 +74,7 @@ func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalCont
 				"name":    compilerInterface.NewString(cfg.Target.Name),
 				"schema":  compilerInterface.NewString(cfg.Target.DataSet),
 				"type":    compilerInterface.NewString("bigquery"),
-				"threads": compilerInterface.NewNumber(float64(fs.NumberWorkers)),
+				"threads": compilerInterface.NewNumber(float64(cfg.Target.Threads)),
 				"project": compilerInterface.NewString(cfg.Target.ProjectID),
 			}),
 		},

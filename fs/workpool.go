@@ -2,9 +2,9 @@ package fs
 
 import (
 	"sync"
-)
 
-const NumberWorkers = 8
+	"ddbt/config"
+)
 
 func ProcessFiles(files []*File, f func(file *File)) {
 	var wait sync.WaitGroup
@@ -18,7 +18,7 @@ func ProcessFiles(files []*File, f func(file *File)) {
 		}
 	}
 
-	for i := 0; i < NumberWorkers; i++ {
+	for i := 0; i < config.NumberThreads(); i++ {
 		go worker()
 	}
 

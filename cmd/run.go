@@ -198,5 +198,5 @@ func executeGraph(graph *fs.Graph) {
 		}
 
 		pb.Increment()
-	}, fs.NumberWorkers, pb)
+	}, config.NumberThreads(), pb)
 }

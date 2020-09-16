@@ -78,33 +78,38 @@ func (pb *ProgressBar) Width() int {
 	return width
 }
 
-func (pb *ProgressBar) draw(includeStatusRows bool) {
+func (pb *ProgressBar) draw(isFinalDraw bool) {
 	pb.statusRowMutex.Lock()
 	defer pb.statusRowMutex.Unlock()
 
 	termWidth := pb.Width()
 
+	var builder strings.Builder
+
 	for i := 0; i < pb.statusRowsLastRender; i++ {
 		// Clear the line
-		_, _ = pb.output.Write([]byte("\r"))
-		_, _ = pb.output.Write([]byte(strings.Repeat(" ", termWidth)))
+		builder.WriteRune('\r')
+		builder.WriteString(strings.Repeat(" ", termWidth))
 
 		// Move up a line
-		_, _ = pb.output.Write([]byte("\x1b[1A\x1b[2K"))
+		builder.WriteString("\x1b[1A\x1b[2K")
 	}
 
-	_, _ = pb.output.Write([]byte("\r"))
-	_, _ = pb.output.Write([]byte(pb.String(termWidth)))
+	builder.WriteRune('\r')
+	builder.WriteString(pb.String(termWidth))
 
-	if includeStatusRows {
+	if !isFinalDraw {
 		for _, row := range pb.statusRows {
-			_, _ = pb.output.Write([]byte(row.String(termWidth)))
+			builder.WriteString(row.String(termWidth))
 		}
 
 		pb.statusRowsLastRender = len(pb.statusRows)
 	} else {
+		builder.WriteRune('\n')
 		pb.statusRowsLastRender = 0
 	}
+
+	_, _ = pb.output.Write([]byte(builder.String()))
 }
 
 func (pb *ProgressBar) Start() {
@@ -144,14 +149,13 @@ func (pb *ProgressBar) tick() {
 		select {
 		case <-pb.ticker.C:
 			// Draw an update in progress
-			pb.draw(true)
+			pb.draw(false)
 
 		case <-pb.finishTicking:
 			pb.ticker.Stop()
 
 			// Draw the final update
-			pb.draw(false)
-			_, _ = pb.output.Write([]byte("\n"))
+			pb.draw(true)
 
 			pb.tickingFinished <- struct{}{}
 			return

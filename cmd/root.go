@@ -18,12 +18,14 @@ var rootCmd = &cobra.Command{
 
 var (
 	targetProfile string
+	threads       int
 )
 
 func init() {
 	cobra.OnInitialize(initDDBT)
 
 	rootCmd.PersistentFlags().StringVarP(&targetProfile, "target", "t", "", "Which target profile to use")
+	rootCmd.PersistentFlags().IntVar(&threads, "threads", 0, "How many threads to execute with")
 }
 
 func Execute() {
@@ -35,7 +37,7 @@ func Execute() {
 
 func initDDBT() {
 	// Read the project config
-	cfg, err := config.Read(targetProfile)
+	cfg, err := config.Read(targetProfile, threads)
 	if err != nil {
 		fmt.Printf("❌ Unable to load config: %s\n", err)
 		os.Exit(1)
