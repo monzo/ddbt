@@ -180,7 +180,6 @@ func executeGraph(graph *fs.Graph) {
 	graph.Execute(func(file *fs.File) {
 		if file.Type == fs.ModelFile {
 			if queryStr, err := bigquery.Run(ctx, file); err != nil {
-				cancel()
 				pb.Stop()
 
 				if err != context.Canceled {
@@ -193,6 +192,7 @@ func executeGraph(graph *fs.Graph) {
 					}
 				}
 
+				cancel()
 				os.Exit(1)
 			}
 		}
