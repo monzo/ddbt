@@ -29,9 +29,6 @@ var runCmd = &cobra.Command{
 	Long:    "Run will execute the request DAG",
 	Example: "ddbt run -m +my_model",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		fmt.Printf("ℹ️ Executing against %s.%s\n", config.GlobalCfg.Target.ProjectID, config.GlobalCfg.Target.DataSet)
-
 		fileSystem := compileAllModels()
 
 		// If we've been given a model to run, run it
@@ -42,6 +39,8 @@ var runCmd = &cobra.Command{
 }
 
 func compileAllModels() *fs.FileSystem {
+	fmt.Printf("ℹ️ Building for %s (%s.%s)\n", config.GlobalCfg.Target.Name, config.GlobalCfg.Target.ProjectID, config.GlobalCfg.Target.DataSet)
+
 	// Read the models on the file system
 	fileSystem, err := fs.ReadFileSystem()
 	if err != nil {

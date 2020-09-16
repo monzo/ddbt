@@ -34,7 +34,7 @@ func Init(cfg *config.Config) (err error) {
 }
 
 func Run(ctx context.Context, f *fs.File) (string, error) {
-	query := buildFinalQuery(f)
+	query := BuildQuery(f)
 
 	q := client.Query(query)
 	q.Location = config.GlobalCfg.Target.Location
@@ -82,7 +82,7 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 	return query, nil
 }
 
-func buildFinalQuery(f *fs.File) string {
+func BuildQuery(f *fs.File) string {
 	var builder strings.Builder
 
 	if udf := f.GetConfig("udf"); udf.Type() == compilerInterface.StringVal {

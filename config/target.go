@@ -45,7 +45,7 @@ func Read(targetProfile string) (*Config, error) {
 	GlobalCfg = &Config{
 		Name: project.Name,
 		Target: &Target{
-			Name:      profile.Target,
+			Name:      targetProfile,
 			ProjectID: output.Project,
 			DataSet:   output.Dataset,
 			Location:  output.Location,
