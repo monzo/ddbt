@@ -88,7 +88,15 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 				}
 			}
 
-			return m.body.Execute(ec)
+			result, err := m.body.Execute(ec)
+			if err != nil {
+				return nil, err
+			}
+			if result == nil {
+				return nil, ec.NilResultFor(caller)
+			}
+
+			return result.Unwrap(), err
 		},
 	)
 

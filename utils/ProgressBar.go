@@ -36,6 +36,10 @@ type ProgressBar struct {
 	finishTicking   chan struct{}
 	tickingFinished chan struct{}
 	ticker          *time.Ticker
+
+	statusRowMutex       sync.Mutex
+	statusRowsLastRender int
+	statusRows           []*StatusRow
 }
 
 func NewProgressBar(label string, numberItems int) *ProgressBar {
@@ -49,6 +53,8 @@ func NewProgressBar(label string, numberItems int) *ProgressBar {
 
 		finishTicking:   make(chan struct{}),
 		tickingFinished: make(chan struct{}),
+
+		statusRows: make([]*StatusRow, 0),
 	}
 
 	pb.Start()
@@ -72,24 +78,49 @@ func (pb *ProgressBar) Width() int {
 	return width
 }
 
-func (pb *ProgressBar) draw() {
+func (pb *ProgressBar) draw(includeStatusRows bool) {
+	pb.statusRowMutex.Lock()
+	defer pb.statusRowMutex.Unlock()
+
+	termWidth := pb.Width()
+
+	for i := 0; i < pb.statusRowsLastRender; i++ {
+		// Clear the line
+		_, _ = pb.output.Write([]byte("\r"))
+		_, _ = pb.output.Write([]byte(strings.Repeat(" ", termWidth)))
+
+		// Move up a line
+		_, _ = pb.output.Write([]byte("\x1b[1A\x1b[2K"))
+	}
+
 	_, _ = pb.output.Write([]byte("\r"))
-	_, _ = pb.output.Write([]byte(pb.String()))
+	_, _ = pb.output.Write([]byte(pb.String(termWidth)))
+
+	if includeStatusRows {
+		for _, row := range pb.statusRows {
+			_, _ = pb.output.Write([]byte(row.String(termWidth)))
+		}
+
+		pb.statusRowsLastRender = len(pb.statusRows)
+	} else {
+		pb.statusRowsLastRender = 0
+	}
 }
 
 func (pb *ProgressBar) Start() {
 	pb.startMutex.Lock()
-	defer pb.startMutex.Unlock()
 
 	if pb.started {
+		pb.startMutex.Unlock()
 		return
 	}
+	pb.started = true
+	pb.startMutex.Unlock()
 
 	pb.ticker = time.NewTicker(refreshRate)
-	pb.started = true
 
 	// Write the initial process of the bar
-	_, _ = pb.output.Write([]byte(pb.String()))
+	_, _ = pb.output.Write([]byte(pb.String(pb.Width())))
 
 	go pb.tick()
 }
@@ -113,13 +144,13 @@ func (pb *ProgressBar) tick() {
 		select {
 		case <-pb.ticker.C:
 			// Draw an update in progress
-			pb.draw()
+			pb.draw(true)
 
 		case <-pb.finishTicking:
 			pb.ticker.Stop()
 
 			// Draw the final update
-			pb.draw()
+			pb.draw(false)
 			_, _ = pb.output.Write([]byte("\n"))
 
 			pb.tickingFinished <- struct{}{}
@@ -128,7 +159,15 @@ func (pb *ProgressBar) tick() {
 	}
 }
 
-func (pb *ProgressBar) String() string {
+func (pb *ProgressBar) lastUpdateTime() time.Time {
+	if pb.started {
+		return time.Now()
+	} else {
+		return pb.lastIncremented
+	}
+}
+
+func (pb *ProgressBar) String(termWidth int) string {
 	completed := pb.completedItems // Because this is atomically updated, grab a local reference
 	percentage := float64(completed) / float64(pb.numberItems)
 
@@ -145,7 +184,7 @@ func (pb *ProgressBar) String() string {
 	builder.WriteString(numItemsStr)
 
 	// Write the time it's taken
-	duration := pb.lastIncremented.Sub(pb.startTime)
+	duration := pb.lastUpdateTime().Sub(pb.startTime)
 	builder.WriteString(fmt.Sprintf(
 		" [%02.0f:%02d]",
 		math.Floor(duration.Minutes()),
@@ -175,7 +214,7 @@ func (pb *ProgressBar) String() string {
 	builder.WriteString(fmt.Sprintf("%3.0f%%", percentage*100))
 
 	// Calculate the Percentage & number of bars to fill
-	spaceForProgressBar := pb.Width() - builder.Len() - 2 - len(rightEdge) // (left/right edge runes)
+	spaceForProgressBar := termWidth - builder.Len() - 2 - len(rightEdge) // (left/right edge runes)
 	barsToFill := int(math.Round(float64(spaceForProgressBar) * percentage))
 
 	// Draw the actual progress bar itself
@@ -191,6 +230,73 @@ func (pb *ProgressBar) String() string {
 
 	// Add the right edge text
 	builder.WriteString(rightEdge)
+
+	return builder.String()
+}
+
+func (pb *ProgressBar) NewStatusRow() *StatusRow {
+	pb.statusRowMutex.Lock()
+	defer pb.statusRowMutex.Unlock()
+
+	sr := &StatusRow{isIdle: true, changed: time.Now()}
+	pb.statusRows = append(pb.statusRows, sr)
+
+	return sr
+}
+
+type StatusRow struct {
+	m sync.Mutex
+
+	message string
+	changed time.Time
+	isIdle  bool
+}
+
+func (sr *StatusRow) Update(message string) {
+	sr.m.Lock()
+	defer sr.m.Unlock()
+
+	sr.message = message
+	sr.changed = time.Now()
+	sr.isIdle = false
+}
+
+func (sr *StatusRow) SetIdle() {
+	sr.m.Lock()
+	defer sr.m.Unlock()
+
+	sr.isIdle = true
+	sr.changed = time.Now()
+	sr.message = "Idle"
+}
+
+func (sr *StatusRow) String(termWidth int) string {
+	sr.m.Lock()
+	defer sr.m.Unlock()
+
+	var builder strings.Builder
+
+	builder.WriteString("\n   ↳ ")
+
+	if !sr.isIdle {
+		duration := time.Now().Sub(sr.changed)
+		builder.WriteString(fmt.Sprintf(
+			"[%02.0f:%02d]",
+			math.Floor(duration.Minutes()),
+			int64(duration.Seconds())%60,
+		))
+	} else {
+		builder.WriteString("[--:--]")
+	}
+	builder.WriteString(" ")
+
+	builder.WriteString(sr.message)
+
+	// Overwrite any old characters from the previous render
+	spaces := termWidth - builder.Len()
+	if spaces > 0 {
+		builder.WriteString(strings.Repeat(" ", spaces))
+	}
 
 	return builder.String()
 }

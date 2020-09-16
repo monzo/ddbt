@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"ddbt/utils"
 )
 
 type Graph struct {
@@ -56,8 +58,33 @@ func (g *Graph) edge(from, to *Node) {
 	to.upstreamNodes[from] = edge
 }
 
+func (g *Graph) AddAllModels(fs *FileSystem) error {
+	visited := make(map[*File]struct{})
+
+	for _, file := range fs.files {
+		if file.Type == ModelFile {
+			g.addUpstreamModels(file, visited)
+		}
+	}
+
+	// Check for circular dependencies & all nodes without upstreams
+	for file := range visited {
+		node := g.getNodeFor(file)
+
+		if node.upstreamContains(node) {
+			return errors.New(fmt.Sprintf("%s has a circular upstream dependency on itself", node.file.Name))
+		}
+	}
+
+	return nil
+}
+
+func (g *Graph) AddNode(file *File) {
+	g.getNodeFor(file)
+}
+
 // Adds a file to the graph which acts as
-func (g *Graph) AddTargetNode(file *File) error {
+func (g *Graph) AddNodeAndUpstreams(file *File) error {
 	visited := make(map[*File]struct{})
 
 	g.addUpstreamModels(file, visited)
@@ -67,7 +94,25 @@ func (g *Graph) AddTargetNode(file *File) error {
 		node := g.getNodeFor(file)
 
 		if node.upstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular upstream dependency on itself", node.file.Name))
+			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+		}
+	}
+
+	return nil
+}
+
+// Adds a file to the graph which acts as
+func (g *Graph) AddNodeAndDownstreams(file *File) error {
+	visited := make(map[*File]struct{})
+
+	g.addDownstreamModels(file, visited)
+
+	// Check for circular dependencies & all nodes without upstreams
+	for file := range visited {
+		node := g.getNodeFor(file)
+
+		if node.downstreamContains(node) {
+			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
 		}
 	}
 
@@ -93,22 +138,45 @@ func (g *Graph) addUpstreamModels(file *File, visited map[*File]struct{}) {
 	}
 }
 
+func (g *Graph) addDownstreamModels(file *File, visited map[*File]struct{}) {
+	if _, found := visited[file]; found {
+		return
+	}
+	visited[file] = struct{}{}
+
+	thisNode := g.getNodeFor(file)
+
+	file.Mutex.Lock()
+	defer file.Mutex.Unlock()
+	for downstream := range file.downstreams {
+		downstreamNode := g.getNodeFor(downstream)
+
+		g.edge(thisNode, downstreamNode)
+
+		g.addDownstreamModels(downstream, visited)
+	}
+}
+
 func (g *Graph) Len() int {
 	return len(g.nodes)
 }
 
-func (g *Graph) Execute(f func(file *File), numWorkers int) {
+func (g *Graph) Execute(f func(file *File), numWorkers int, pb *utils.ProgressBar) {
 	c := make(chan *Node, len(g.nodes))
 
 	g.wait.Add(len(g.nodes))
 
 	worker := func() {
+		statusRow := pb.NewStatusRow()
+
 		for node := range c {
+			statusRow.Update(fmt.Sprintf("Running %s", node.file.Name))
+
 			f(node.file)
-
 			node.markNodeAsRun(c)
-
 			g.wait.Done()
+
+			statusRow.SetIdle()
 		}
 	}
 
@@ -135,6 +203,23 @@ func (n *Node) upstreamContains(other *Node) bool {
 		}
 
 		if upstream.upstreamContains(other) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (n *Node) downstreamContains(other *Node) bool {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
+	for downstream := range n.downstreamNodes {
+		if downstream == other {
+			return true
+		}
+
+		if downstream.downstreamContains(other) {
 			return true
 		}
 	}

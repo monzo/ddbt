@@ -1,17 +1,15 @@
-package utils
+package fs
 
 import (
 	"sync"
-
-	"ddbt/fs"
 )
 
-const NumberWorkers = 4
+const NumberWorkers = 8
 
-func ProcessFiles(files []*fs.File, f func(file *fs.File)) {
+func ProcessFiles(files []*File, f func(file *File)) {
 	var wait sync.WaitGroup
 
-	c := make(chan *fs.File, len(files))
+	c := make(chan *File, len(files))
 
 	worker := func() {
 		for file := range c {

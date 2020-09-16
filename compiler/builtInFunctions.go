@@ -8,6 +8,7 @@ import (
 	"ddbt/compilerInterface"
 	"ddbt/config"
 	"ddbt/fs"
+	"ddbt/utils"
 )
 
 var builtInFunctions = map[string]compilerInterface.FunctionDef{
@@ -49,7 +50,7 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 	"config": nil, // Note this is defined by the compiler when creating the original execution context
 
 	"dbt_version": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-		return compilerInterface.NewString("ddbt v0.0.1 [experimental]"), nil
+		return compilerInterface.NewString(utils.DdbtVersion), nil
 	},
 
 	"debug": notImplemented(),

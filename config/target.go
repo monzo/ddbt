@@ -12,6 +12,7 @@ type Target struct {
 	Name      string
 	ProjectID string
 	DataSet   string
+	Location  string
 }
 
 type Config struct {
@@ -21,7 +22,7 @@ type Config struct {
 
 var GlobalCfg *Config
 
-func Read() (*Config, error) {
+func Read(targetProfile string) (*Config, error) {
 	project, err := readDBTProject()
 	if err != nil {
 		return nil, err
@@ -32,9 +33,13 @@ func Read() (*Config, error) {
 		return nil, err
 	}
 
-	output, found := profile.Outputs[profile.Target]
+	if targetProfile == "" {
+		targetProfile = profile.Target
+	}
+
+	output, found := profile.Outputs[targetProfile]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("Output `%s` of profile `%s` not found", profile.Target, project.Profile))
+		return nil, errors.New(fmt.Sprintf("Output `%s` of profile `%s` not found", targetProfile, project.Profile))
 	}
 
 	GlobalCfg = &Config{
@@ -43,6 +48,7 @@ func Read() (*Config, error) {
 			Name:      profile.Target,
 			ProjectID: output.Project,
 			DataSet:   output.Dataset,
+			Location:  output.Location,
 		},
 	}
 
@@ -70,8 +76,9 @@ func readDBTProject() (dbtProject, error) {
 }
 
 type dbtOutputs struct {
-	Project string `yaml:"project"`
-	Dataset string `yaml:"dataset"`
+	Project  string `yaml:"project"`
+	Dataset  string `yaml:"dataset"`
+	Location string `yaml:"location"`
 }
 
 type dbtProfile struct {
