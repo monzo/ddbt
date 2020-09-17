@@ -437,3 +437,10 @@ func TestDefineCheck(t *testing.T) {
 			{% if map["key"] is not none %}Passed{% else %}Fail{% endif%}`,
 	)
 }
+
+func TestStringParsing(t *testing.T) {
+	assertCompileOutput(t,
+		`Hello " \World`,
+		`{% set data="Hello \" \\World" %}{{ data }}`,
+	)
+}

@@ -24,6 +24,6 @@ func TestReturnInMacro(t *testing.T) {
 	assertCompileOutput(t, "pass",
 		`
 {%- macro test(a) %}{{ return(a) }} This should not be returned; {{ caller() }}{% endmacro -%}
-{% call test("pass") %}fail{% endcall %}
+{% call test("pass") %}fail{% endcall -%}
 `)
 }

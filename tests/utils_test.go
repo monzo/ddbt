@@ -3,6 +3,7 @@ package tests
 import (
 	"ddbt/compiler"
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/jinja"
 	"fmt"
@@ -65,7 +66,17 @@ func compileFromRaw(t *testing.T, raw string) string {
 	require.NotNil(t, file.SyntaxTree, "target_model syntax tree is empty!")
 
 	// Create the execution context
-	gc := compiler.NewGlobalContext(nil, fileSystem)
+	config.GlobalCfg = &config.Config{
+		Name: "Unit Test",
+		Target: &config.Target{
+			Name:      "unit_test",
+			ProjectID: "unit_test_project",
+			DataSet:   "unit_test_dataset",
+			Location:  "US",
+			Threads:   4,
+		},
+	}
+	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
 	ec := compiler.NewExecutionContext(file, fileSystem, gc)
 	ec.SetVariable("config", file.ConfigObject())
 	for key, value := range testVariables {

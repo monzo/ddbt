@@ -381,12 +381,19 @@ func (l *lexer) nextBlockToken() (*Token, error) {
 func (l *lexer) readStringToken(exitRune rune) (*Token, error) {
 	// Read all the characters in the string
 	var buf strings.Builder
-	for l.nextRune != exitRune && l.nextRune != 0 {
+	escaped := false
+
+	for (escaped || l.nextRune != exitRune) && l.nextRune != 0 {
 		if err := l.readRune(); err != nil {
 			return nil, err
 		}
 
-		buf.WriteRune(l.currentRune)
+		if l.currentRune == '\\' && !escaped {
+			escaped = true
+		} else {
+			escaped = false
+			buf.WriteRune(l.currentRune)
+		}
 	}
 
 	// Consume the closing rune

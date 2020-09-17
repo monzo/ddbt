@@ -92,6 +92,11 @@ func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) e
 	case fs.MacroFile:
 		upstream = e.fileSystem.Macro(modelName)
 
+		if upstream == nil {
+			// For tests
+			upstream = e.fileSystem.Model(modelName)
+		}
+
 	default:
 		return errors.New(fmt.Sprintf("unknown file type: %s", fileType))
 	}
