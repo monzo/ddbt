@@ -43,10 +43,6 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 		m.name,
 		macroEC,
 		func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-			if len(args) < len(m.parameters)-m.numOptionalParams {
-				return nil, ec.ErrorAt(caller, fmt.Sprintf("%d args required, got %d", len(m.parameters)-m.numOptionalParams, len(args)))
-			}
-
 			// quick lookup map
 			namedArgs := make(map[string]*compilerInterface.Value)
 			for _, arg := range args {
@@ -59,32 +55,24 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 
 			// Process all the parameters, checking what args where provided
 			for i, param := range m.parameters {
-				if param.defaultValue == nil {
-					arg := args[i]
+				if value, found := namedArgs[param.name]; found {
+					ec.SetVariable(param.name, value)
 
-					// Required paramters have to be given in the correct order
-					if arg.Name != "" && param.name != arg.Name {
-						return nil, ec.ErrorAt(caller, fmt.Sprintf("%s is a required parameter, was given %s", param.name, arg.Name))
-					}
-
-					ec.SetVariable(param.name, arg.Value)
-				} else {
-					if stillOrdered && i < len(args) && (args[i].Name == "" || args[i].Name == param.name) {
-						ec.SetVariable(param.name, args[i].Value)
-					} else {
-						stillOrdered = false
-
-						if setAs, found := namedArgs[param.name]; found {
-							ec.SetVariable(param.name, setAs)
-						} else {
-							value, err := compilerInterface.ValueFromToken(param.defaultValue)
-							if err != nil {
-								return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
-							}
-
-							ec.SetVariable(param.name, value)
+					stillOrdered = len(args) > i && args[i].Name == param.name
+				} else if len(args) <= i {
+					if param.defaultValue != nil {
+						value, err := compilerInterface.ValueFromToken(param.defaultValue)
+						if err != nil {
+							return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to understand default value for %s: %s", param.name, err))
 						}
+						ec.SetVariable(param.name, value)
+					} else {
+						ec.SetVariable(param.name, compilerInterface.NewUndefined())
 					}
+				} else if !stillOrdered {
+					return nil, ec.ErrorAt(caller, fmt.Sprintf("Named arguments have been used out of order, please either used all named arguments or keep them in order. Unable to identify what %s should be.", param.name))
+				} else {
+					ec.SetVariable(param.name, args[i].Value)
 				}
 			}
 
