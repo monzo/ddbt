@@ -24,7 +24,7 @@ func ParseFile(file *fs.File) error {
 	return nil
 }
 
-func CompileModel(file *fs.File, gc *GlobalContext) error {
+func CompileModel(file *fs.File, gc *GlobalContext, isExecuting bool) error {
 	ec := NewExecutionContext(file, gc.fileSystem, gc)
 
 	ec.SetVariable("this", compilerInterface.NewMap(map[string]*compilerInterface.Value{
@@ -34,6 +34,7 @@ func CompileModel(file *fs.File, gc *GlobalContext) error {
 	}))
 
 	ec.SetVariable("config", file.ConfigObject())
+	ec.SetVariable("execute", compilerInterface.NewBoolean(isExecuting))
 
 	finalAST, err := file.SyntaxTree.Execute(ec)
 	if err != nil {

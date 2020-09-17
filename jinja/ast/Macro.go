@@ -43,6 +43,8 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 		m.name,
 		macroEC,
 		func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+			ec.SetVariable("varargs", args.ToVarArgs())
+
 			// quick lookup map
 			namedArgs := make(map[string]*compilerInterface.Value)
 			for _, arg := range args {
@@ -59,7 +61,9 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 					ec.SetVariable(param.name, value)
 
 					stillOrdered = len(args) > i && args[i].Name == param.name
-				} else if len(args) <= i {
+				} else if len(args) <= i || args[i].Name != "" {
+					stillOrdered = false
+
 					if param.defaultValue != nil {
 						value, err := compilerInterface.ValueFromToken(param.defaultValue)
 						if err != nil {

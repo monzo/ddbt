@@ -88,7 +88,7 @@ func (fl *ForLoop) executeForList(list []*compilerInterface.Value, parentEC comp
 			return nil, err
 		}
 
-		if err := writeValue(ec, fl.body, &builder, result); err != nil {
+		if err := writeValue(ec, fl.body, &builder, result, false); err != nil {
 			return nil, err
 		}
 	}
@@ -128,7 +128,7 @@ func (fl *ForLoop) executeForMap(list map[string]*compilerInterface.Value, paren
 			return nil, err
 		}
 
-		if err := writeValue(ec, fl.body, &builder, result); err != nil {
+		if err := writeValue(ec, fl.body, &builder, result, false); err != nil {
 			return nil, err
 		}
 

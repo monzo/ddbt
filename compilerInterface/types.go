@@ -15,6 +15,7 @@ type ExecutionContext interface {
 	RegisterUpstream(name string, fileType string) error
 
 	FileName() string
+	MarkAsDynamicSQL() (*Value, error)
 }
 
 type AST interface {
@@ -29,5 +30,15 @@ type Argument struct {
 }
 
 type Arguments []Argument
+
+func (args Arguments) ToVarArgs() *Value {
+	varargs := make([]*Value, len(args))
+
+	for i, value := range args {
+		varargs[i] = value.Value
+	}
+
+	return NewList(varargs)
+}
 
 type FunctionDef func(ec ExecutionContext, caller AST, args Arguments) (*Value, error)

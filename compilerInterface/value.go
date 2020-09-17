@@ -3,6 +3,7 @@ package compilerInterface
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"ddbt/jinja/lexer"
@@ -50,6 +51,10 @@ func NewNumber(value float64) *Value {
 
 func NewMap(data map[string]*Value) *Value {
 	return &Value{ValueType: MapVal, MapValue: data}
+}
+
+func NewList(data []*Value) *Value {
+	return &Value{ValueType: ListVal, ListValue: data}
 }
 
 func NewFunction(f FunctionDef) *Value {
@@ -120,6 +125,14 @@ func (v *Value) Properties() map[string]*Value {
 	case ListVal:
 		return map[string]*Value{
 			"items": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) { return v, nil }),
+			"extend": NewFunction(func(_ ExecutionContext, _ AST, args Arguments) (*Value, error) {
+				for _, arg := range args[0].Value.ListValue {
+					if arg != v {
+						v.ListValue = append(v.ListValue, arg)
+					}
+				}
+				return v, nil
+			}),
 		}
 
 	case ReturnVal:
@@ -177,7 +190,7 @@ func (v *Value) AsStringValue() string {
 		return fmt.Sprintf("%p", v.ListValue)
 
 	case MapVal:
-		return fmt.Sprintf("%p", v.ListValue)
+		return fmt.Sprintf("%p", v.MapValue)
 
 	case NullVal, Undefined:
 		return ""
@@ -315,5 +328,29 @@ func ValueFromToken(t *lexer.Token) (*Value, error) {
 
 	default:
 		return nil, errors.New(fmt.Sprintf("unable to convert %s to value", t.Type))
+	}
+}
+
+func NewValueFromInterface(value interface{}) (*Value, error) {
+	switch v := value.(type) {
+	case string:
+		return NewString(v), nil
+	case int:
+		return NewNumber(float64(v)), nil
+	case int64:
+		return NewNumber(float64(v)), nil
+	case uint:
+		return NewNumber(float64(v)), nil
+	case uint64:
+		return NewNumber(float64(v)), nil
+	case float32:
+		return NewNumber(float64(v)), nil
+	case float64:
+		return NewNumber(v), nil
+	case bool:
+		return NewBoolean(v), nil
+
+	default:
+		return nil, errors.New(fmt.Sprintf("Unknown value type %v", reflect.TypeOf(value)))
 	}
 }

@@ -112,3 +112,8 @@ func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) e
 func (e *ExecutionContext) FileName() string {
 	return e.file.Name
 }
+
+func (e *ExecutionContext) MarkAsDynamicSQL() (*compilerInterface.Value, error) {
+	e.file.MaskAsDynamicSQL()
+	return compilerInterface.NewUndefined(), nil
+}

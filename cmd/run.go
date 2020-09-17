@@ -29,16 +29,16 @@ var runCmd = &cobra.Command{
 	Long:    "Run will execute the request DAG",
 	Example: "ddbt run -m +my_model",
 	Run: func(cmd *cobra.Command, args []string) {
-		fileSystem := compileAllModels()
+		fileSystem, globalContext := compileAllModels()
 
 		// If we've been given a model to run, run it
 		graph := buildGraph(fileSystem, ModelFilter)
 
-		executeGraph(graph)
+		executeGraph(graph, globalContext)
 	},
 }
 
-func compileAllModels() *fs.FileSystem {
+func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	fmt.Printf("ℹ️ Building for %s (%s.%s)\n", config.GlobalCfg.Target.Name, config.GlobalCfg.Target.ProjectID, config.GlobalCfg.Target.DataSet)
 
 	// Read the models on the file system
@@ -54,7 +54,7 @@ func compileAllModels() *fs.FileSystem {
 	compileMacros(fileSystem, gc)
 	compileFiles(fileSystem, gc)
 
-	return fileSystem
+	return fileSystem, gc
 }
 
 func parseFiles(fileSystem *fs.FileSystem) {
@@ -81,7 +81,7 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	fs.ProcessFiles(
 		fileSystem.Macros(),
 		func(file *fs.File) {
-			err := compiler.CompileModel(file, gc)
+			err := compiler.CompileModel(file, gc, false)
 			if err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to compile %s %s: %s\n", file.Type, file.Name, err)
@@ -99,7 +99,7 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	fs.ProcessFiles(
 		fileSystem.Models(),
 		func(file *fs.File) {
-			err := compiler.CompileModel(file, gc)
+			err := compiler.CompileModel(file, gc, false)
 			if err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to compile %s %s: %s\n", file.Type, file.Name, err)
@@ -171,7 +171,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
 	return graph
 }
 
-func executeGraph(graph *fs.Graph) {
+func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("🚀 Executing DAG", graph.Len())
 	defer pb.Stop()
 
@@ -179,6 +179,15 @@ func executeGraph(graph *fs.Graph) {
 
 	graph.Execute(func(file *fs.File) {
 		if file.Type == fs.ModelFile {
+			if file.IsDynamicSQL() {
+				if err := compiler.CompileModel(file, globalContext, true); err != nil {
+					pb.Stop()
+					fmt.Printf("❌ %s\n", err)
+					cancel()
+					os.Exit(1)
+				}
+			}
+
 			if queryStr, err := bigquery.Run(ctx, file); err != nil {
 				pb.Stop()
 

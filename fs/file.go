@@ -27,6 +27,7 @@ type File struct {
 
 	Mutex            sync.Mutex
 	SyntaxTree       ast.AST
+	isDynamicSQL     bool // does this need recompiling as part of the DAG?
 	CompiledContents string
 
 	PrereadFileContents string // Used for testing
@@ -140,4 +141,17 @@ func (f *File) RecordDependencyOn(upstream *File) {
 	upstream.Mutex.Lock()
 	upstream.downstreams[f] = struct{}{}
 	upstream.Mutex.Unlock()
+}
+
+func (f *File) MaskAsDynamicSQL() {
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	f.isDynamicSQL = true
+}
+
+func (f *File) IsDynamicSQL() bool {
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+
+	return f.isDynamicSQL
 }

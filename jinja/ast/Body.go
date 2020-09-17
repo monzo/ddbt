@@ -38,7 +38,7 @@ func (b *Body) Execute(ec compilerInterface.ExecutionContext) (*compilerInterfac
 			return nil, err
 		}
 
-		if err := writeValue(ec, part, &builder, result); err != nil {
+		if err := writeValue(ec, part, &builder, result, false); err != nil {
 			return nil, err
 		}
 
@@ -67,14 +67,38 @@ func (b *Body) Append(node AST) {
 	b.parts = append(b.parts, node)
 }
 
-func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AST, builder *strings.Builder, value *compilerInterface.Value) error {
+func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AST, builder *strings.Builder, value *compilerInterface.Value, wrapAndEscape bool) error {
 	if value == nil {
 		return ec.NilResultFor(part)
 	}
 
+	// Remove the "ReturnVal" wrapper
+	value = value.Unwrap()
+
 	t := value.Type()
 	switch t {
-	case compilerInterface.StringVal, compilerInterface.NumberVal, compilerInterface.BooleanValue, compilerInterface.ReturnVal:
+	case compilerInterface.StringVal:
+		if wrapAndEscape {
+			str := strings.Replace(
+				strings.Replace(
+					value.AsStringValue(),
+					"\\",
+					"\\\\'",
+					-1,
+				),
+				"\"",
+				"\\\"",
+				-1,
+			)
+
+			builder.WriteString("\\\"")
+			builder.WriteString(str)
+			builder.WriteString("\\\"")
+		} else {
+			builder.WriteString(value.AsStringValue())
+		}
+
+	case compilerInterface.NumberVal, compilerInterface.BooleanValue:
 		builder.WriteString(value.AsStringValue())
 
 	case compilerInterface.ListVal:
@@ -84,7 +108,7 @@ func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AS
 				builder.WriteString(", ")
 			}
 
-			if err := writeValue(ec, part, builder, item); err != nil {
+			if err := writeValue(ec, part, builder, item, true); err != nil {
 				return err
 			}
 		}
@@ -98,11 +122,11 @@ func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AS
 				builder.WriteString(", ")
 			}
 
-			builder.WriteRune('"')
+			builder.WriteString("\\\"")
 			builder.WriteString(key)
-			builder.WriteString("\": ")
+			builder.WriteString("\\\": ")
 
-			if err := writeValue(ec, part, builder, item); err != nil {
+			if err := writeValue(ec, part, builder, item, true); err != nil {
 				return err
 			}
 			i++

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"ddbt/compiler/dbtUtils"
 	"ddbt/compilerInterface"
 	"ddbt/config"
 	"ddbt/fs"
@@ -33,6 +34,14 @@ func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalCont
 		macros:     make(map[string]*macroDef),
 		constants: map[string]*compilerInterface.Value{
 			"adapter": funcMapAsValue(adapterFunctions),
+
+			"dbt_utils": funcMapAsValue(map[string]compilerInterface.FunctionDef{
+				"union_all_tables":  dbtUtils.UnionAllTables,
+				"get_column_values": dbtUtils.GetColumnValues,
+				"pivot":             dbtUtils.Pivot,
+				"unpivot":           dbtUtils.Unpivot,
+				"group_by":          dbtUtils.GroupBy,
+			}),
 
 			"exceptions": funcMapAsValue(funcMap{
 				"raise_compiler_error": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
@@ -140,7 +149,7 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 				return nil, err
 			}
 
-			if err := CompileModel(file, g); err != nil {
+			if err := CompileModel(file, g, true); err != nil {
 				return nil, err
 			}
 
@@ -190,4 +199,8 @@ func (g *GlobalContext) RegisterUpstream(name string, fileType string) error {
 
 func (g *GlobalContext) FileName() string {
 	panic("FileName not implemented for global context")
+}
+
+func (g *GlobalContext) MarkAsDynamicSQL() (*compilerInterface.Value, error) {
+	panic("Mark as dynamic SQL not support on the global context")
 }

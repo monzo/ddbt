@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/iterator"
 
 	"ddbt/compilerInterface"
 	"ddbt/config"
@@ -93,4 +94,85 @@ func BuildQuery(f *fs.File) string {
 	builder.WriteString(f.CompiledContents)
 
 	return builder.String()
+}
+
+type Value = bigquery.Value
+type Schema = bigquery.Schema
+
+func Quote(value string) string {
+	// ' => \'
+	// \' => \\\'
+	// \ => \\
+	return strings.Replace(
+		strings.Replace(
+			value,
+			"\\",
+			"\\\\'",
+			-1,
+		),
+		"'",
+		"\\'",
+		-1,
+	)
+}
+
+func GetRows(query string) ([][]Value, Schema, error) {
+	ctx := context.Background()
+
+	q := client.Query(query)
+	q.Location = config.GlobalCfg.Target.Location
+
+	// Default read information
+	q.DefaultProjectID = config.GlobalCfg.Target.ProjectID
+	q.DefaultDatasetID = config.GlobalCfg.Target.DataSet
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Unable to run query %s\n\n%s", query, err))
+	}
+
+	status, err := job.Wait(ctx)
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Error executing query %s\n\n%s", query, err))
+	}
+
+	if status.State != bigquery.Done {
+		return nil, nil, errors.New(fmt.Sprintf("Model %s's exuection job %s in state %s", query, job.ID(), status.State))
+	}
+
+	if err := status.Err(); err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", query, err))
+	}
+
+	itr, err := job.Read(ctx)
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", query, err))
+	}
+
+	rows := make([][]Value, 0)
+	schema := itr.Schema
+
+	for {
+		var row []bigquery.Value
+		err := itr.Next(&row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+
+		rows = append(rows, row)
+	}
+
+	return rows, schema, nil
+}
+
+func GetColumnsFromTable(table string) (Schema, error) {
+	_, schema, err := GetRows(fmt.Sprintf("SELECT * FROM %s LIMIT 0"))
+	if err != nil {
+		return nil, err
+	}
+
+	return schema, nil
 }

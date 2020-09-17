@@ -22,7 +22,8 @@ func (b *UnsupportedExpressionBlock) Position() lexer.Position {
 }
 
 func (b *UnsupportedExpressionBlock) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
-	return nil, nil
+	//  These will return nil blocks for now
+	return compilerInterface.NewUndefined(), nil
 }
 
 func (b *UnsupportedExpressionBlock) String() string {
