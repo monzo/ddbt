@@ -57,6 +57,16 @@ func NewList(data []*Value) *Value {
 	return &Value{ValueType: ListVal, ListValue: data}
 }
 
+func NewStringList(data []string) *Value {
+	l := make([]*Value, len(data))
+
+	for i, s := range data {
+		l[i] = NewString(s)
+	}
+
+	return NewList(l)
+}
+
 func NewFunction(f FunctionDef) *Value {
 	return &Value{
 		ValueType: FunctionalVal,

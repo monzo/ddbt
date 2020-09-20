@@ -27,6 +27,9 @@ type File struct {
 	Name string
 	Path string
 
+	cfgMutex     sync.Mutex
+	FolderConfig config.ModelConfig
+
 	Mutex            sync.Mutex
 	SyntaxTree       ast.AST
 	isDynamicSQL     bool // does this need recompiling as part of the DAG?
@@ -40,17 +43,23 @@ type File struct {
 	// Graph tracking
 	upstreams   map[*File]struct{}
 	downstreams map[*File]struct{}
+
+	//ctesMutex     sync.Mutex
+	EphemeralCTES map[string]*File
 }
 
 func newFile(path string, file os.FileInfo, fileType FileType) *File {
 	return &File{
-		Type: fileType,
-		Name: strings.TrimSuffix(filepath.Base(path), ".sql"),
-		Path: path,
+		Type:         fileType,
+		Name:         strings.TrimSuffix(filepath.Base(path), ".sql"),
+		Path:         path,
+		FolderConfig: config.GetFolderConfig(path),
 
 		config:      make(map[string]*compilerInterface.Value),
 		upstreams:   make(map[*File]struct{}),
 		downstreams: make(map[*File]struct{}),
+
+		EphemeralCTES: make(map[string]*File),
 	}
 }
 
@@ -68,7 +77,26 @@ func (f *File) GetConfig(name string) *compilerInterface.Value {
 	if value, found := f.config[name]; found {
 		return value.Unwrap()
 	} else {
-		return compilerInterface.NewUndefined()
+		// If not overridden pick up from the folder default
+		switch name {
+		case "enabled":
+			return compilerInterface.NewBoolean(f.FolderConfig.Enabled)
+
+		case "tags":
+			return compilerInterface.NewStringList(f.FolderConfig.Tags)
+
+		case "pre_hooks":
+			return compilerInterface.NewStringList(f.FolderConfig.PreHooks)
+
+		case "post_hooks":
+			return compilerInterface.NewStringList(f.FolderConfig.PostHooks)
+
+		case "materialized":
+			return compilerInterface.NewString(f.FolderConfig.Materialized)
+
+		default:
+			return compilerInterface.NewUndefined()
+		}
 	}
 }
 
@@ -118,7 +146,13 @@ func (f *File) ConfigObject() *compilerInterface.Value {
 			f.SetConfig(arg.Name, arg.Value)
 		}
 
-		if enabledValue := f.GetConfig("enabled").Unwrap(); enabledValue.Type() == compilerInterface.BooleanValue && !enabledValue.BooleanValue {
+		if materialized := f.GetConfig("materialized"); materialized.Type() == compilerInterface.StringVal && materialized.StringValue != "" {
+			f.cfgMutex.Lock()
+			f.FolderConfig.Materialized = materialized.StringValue
+			f.cfgMutex.Unlock()
+		}
+
+		if enabledValue := f.GetConfig("enabled"); enabledValue.Type() == compilerInterface.BooleanValue && !enabledValue.BooleanValue {
 			// This model is not enable and should return undefined (this stops the execution of the AST for the model)
 			return compilerInterface.NewReturnValue(compilerInterface.NewUndefined()), nil
 		}
@@ -209,4 +243,11 @@ func (f *File) GetTarget() (*config.Target, error) {
 	}
 
 	return target, nil
+}
+
+func (f *File) GetMaterialization() string {
+	f.cfgMutex.Lock()
+	defer f.cfgMutex.Unlock()
+
+	return f.FolderConfig.Materialized
 }

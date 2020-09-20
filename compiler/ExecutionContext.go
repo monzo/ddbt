@@ -17,17 +17,22 @@ type ExecutionContext struct {
 	varaiblesMutex sync.RWMutex
 	variables      map[string]*compilerInterface.Value
 	states         []map[string]*compilerInterface.Value
-	parentContext  compilerInterface.ExecutionContext
+	isExecuting    bool
+
+	globalContext *GlobalContext
+	parentContext compilerInterface.ExecutionContext
 }
 
 // Ensure our execution context matches the interface in the AST package
 var _ compilerInterface.ExecutionContext = &ExecutionContext{}
 
-func NewExecutionContext(file *fs.File, fileSystem *fs.FileSystem, parent compilerInterface.ExecutionContext) *ExecutionContext {
+func NewExecutionContext(file *fs.File, fileSystem *fs.FileSystem, isExecuting bool, globalContext *GlobalContext, parent compilerInterface.ExecutionContext) *ExecutionContext {
 	return &ExecutionContext{
 		file:          file,
 		fileSystem:    fileSystem,
 		variables:     make(map[string]*compilerInterface.Value),
+		isExecuting:   isExecuting,
+		globalContext: globalContext,
 		parentContext: parent,
 	}
 }
@@ -69,7 +74,7 @@ func (e *ExecutionContext) NilResultFor(part compilerInterface.AST) error {
 }
 
 func (e *ExecutionContext) PushState() compilerInterface.ExecutionContext {
-	return NewExecutionContext(e.file, e.fileSystem, e)
+	return NewExecutionContext(e.file, e.fileSystem, e.isExecuting, e.globalContext, e)
 }
 
 func (e *ExecutionContext) CopyVariablesInto(ec compilerInterface.ExecutionContext) {
@@ -113,9 +118,34 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 		return nil, err
 	}
 
-	return compilerInterface.NewString(
-		"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
-	), nil
+	switch upstream.GetMaterialization() {
+	case "table":
+		return compilerInterface.NewString(
+			"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
+		), nil
+
+	case "ephemeral":
+		err := CompileModel(upstream, e.globalContext, e.isExecuting)
+		if err != nil {
+			return nil, err
+		}
+
+		cteName := fmt.Sprintf("__dbt__CTE__%s", upstream.Name)
+
+		e.file.Mutex.Lock()
+		e.file.EphemeralCTES[cteName] = upstream
+		e.file.Mutex.Unlock()
+
+		return compilerInterface.NewString(cteName), nil
+
+	case "incremental":
+		return compilerInterface.NewString(
+			"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
+		), nil
+
+	default:
+		return nil, errors.New(fmt.Sprintf("unknown materialized config '%s' in model '%s'", upstream.GetMaterialization(), upstream.Name))
+	}
 }
 
 func (e *ExecutionContext) FileName() string {

@@ -178,7 +178,7 @@ func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	graph.Execute(func(file *fs.File) {
-		if file.Type == fs.ModelFile {
+		if file.Type == fs.ModelFile && file.GetMaterialization() != "ephemeral" {
 			if file.IsDynamicSQL() {
 				if err := compiler.CompileModel(file, globalContext, true); err != nil {
 					pb.Stop()

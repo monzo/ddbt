@@ -34,7 +34,7 @@ func (c *Config) GetTargetFor(path string) *Target {
 
 var GlobalCfg *Config
 
-func Read(targetProfile string, threads int) (*Config, error) {
+func Read(targetProfile string, threads int, strExecutor func(s string) (string, error)) (*Config, error) {
 	project, err := readDBTProject()
 	if err != nil {
 		return nil, err
@@ -92,6 +92,14 @@ func Read(targetProfile string, threads int) (*Config, error) {
 		GlobalCfg.ModelGroups = modelGroups
 	}
 
+	if settings, found := project.Models[project.Name]; found {
+		if err := readGeneralFolderBasedConfig(settings, strExecutor); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New(fmt.Sprintf("no models config found, expected to find `models: %s:` in `dbt_project.yml`", project.Name))
+	}
+
 	return GlobalCfg, nil
 }
 
@@ -100,8 +108,9 @@ func NumberThreads() int {
 }
 
 type dbtProject struct {
-	Name    string `yaml:"name"`
-	Profile string `yaml:"profile"`
+	Name    string                            `yaml:"name"`
+	Profile string                            `yaml:"profile"`
+	Models  map[string]map[string]interface{} `yaml:"models"` // "Models[project_name][key]value"
 }
 
 func readDBTProject() (dbtProject, error) {

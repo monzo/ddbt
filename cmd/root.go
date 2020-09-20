@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"ddbt/bigquery"
+	"ddbt/compiler"
 	"ddbt/config"
 )
 
@@ -37,7 +38,7 @@ func Execute() {
 
 func initDDBT() {
 	// Read the project config
-	cfg, err := config.Read(targetProfile, threads)
+	cfg, err := config.Read(targetProfile, threads, compiler.CompileStringWithCache)
 	if err != nil {
 		fmt.Printf("❌ Unable to load config: %s\n", err)
 		os.Exit(1)

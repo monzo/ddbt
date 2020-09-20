@@ -68,7 +68,7 @@ func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalCont
 			}),
 
 			// We are always executing (https://docs.getdbt.com/reference/dbt-jinja-functions/execute)
-			"execute": compilerInterface.NewBoolean(true),
+			"execute": nil, // Set by the compiler when it creates an execution context
 
 			// https://docs.getdbt.com/reference/dbt-jinja-functions/modules
 			"modules": compilerInterface.NewMap(map[string]*compilerInterface.Value{
@@ -79,13 +79,7 @@ func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalCont
 			"project_name": compilerInterface.NewString(cfg.Name),
 
 			// https://docs.getdbt.com/reference/dbt-jinja-functions/target
-			"target": compilerInterface.NewMap(map[string]*compilerInterface.Value{
-				"name":    compilerInterface.NewString(cfg.Target.Name),
-				"schema":  compilerInterface.NewString(cfg.Target.DataSet),
-				"type":    compilerInterface.NewString("bigquery"),
-				"threads": compilerInterface.NewNumber(float64(cfg.Target.Threads)),
-				"project": compilerInterface.NewString(cfg.Target.ProjectID),
-			}),
+			"target": nil, // Set by the compiler when it creates an execution context
 		},
 	}
 }
