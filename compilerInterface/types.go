@@ -1,6 +1,9 @@
 package compilerInterface
 
-import "ddbt/jinja/lexer"
+import (
+	"ddbt/config"
+	"ddbt/jinja/lexer"
+)
 
 type ExecutionContext interface {
 	SetVariable(name string, value *Value)
@@ -12,9 +15,10 @@ type ExecutionContext interface {
 	CopyVariablesInto(ec ExecutionContext)
 
 	RegisterMacro(name string, ec ExecutionContext, function FunctionDef)
-	RegisterUpstream(name string, fileType string) error
+	RegisterUpstreamAndGetRef(name string, fileType string) (*Value, error)
 
 	FileName() string
+	GetTarget() (*config.Target, error)
 	MarkAsDynamicSQL() (*Value, error)
 }
 

@@ -169,7 +169,7 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 	}
 
 	return func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-		if err := ec.RegisterUpstream(macro.fileName, fs.MacroFile); err != nil {
+		if _, err := ec.RegisterUpstreamAndGetRef(macro.fileName, fs.MacroFile); err != nil {
 			return nil, ec.ErrorAt(caller, err.Error())
 		}
 
@@ -193,12 +193,16 @@ func (g *GlobalContext) RegisterMacro(name string, ec compilerInterface.Executio
 	}
 }
 
-func (g *GlobalContext) RegisterUpstream(name string, fileType string) error {
-	panic("RegisterUpstream not implemented for global context")
+func (g *GlobalContext) RegisterUpstreamAndGetRef(name string, fileType string) (*compilerInterface.Value, error) {
+	panic("RegisterUpstreamAndGetRef not implemented for global context")
 }
 
 func (g *GlobalContext) FileName() string {
 	panic("FileName not implemented for global context")
+}
+
+func (g *GlobalContext) GetTarget() (*config.Target, error) {
+	panic("GetTarget not implemented for global context")
 }
 
 func (g *GlobalContext) MarkAsDynamicSQL() (*compilerInterface.Value, error) {

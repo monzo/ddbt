@@ -39,7 +39,7 @@ var runCmd = &cobra.Command{
 }
 
 func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
-	fmt.Printf("ℹ️ Building for %s (%s.%s)\n", config.GlobalCfg.Target.Name, config.GlobalCfg.Target.ProjectID, config.GlobalCfg.Target.DataSet)
+	fmt.Printf("ℹ️ Building for %s profile\n", config.GlobalCfg.Target.Name)
 
 	// Read the models on the file system
 	fileSystem, err := fs.ReadFileSystem()

@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"sync"
 
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/jinja/ast"
 )
 
@@ -64,7 +66,7 @@ func (f *File) GetConfig(name string) *compilerInterface.Value {
 	defer f.configMutex.RUnlock()
 
 	if value, found := f.config[name]; found {
-		return value
+		return value.Unwrap()
 	} else {
 		return compilerInterface.NewUndefined()
 	}
@@ -154,4 +156,57 @@ func (f *File) IsDynamicSQL() bool {
 	defer f.Mutex.Unlock()
 
 	return f.isDynamicSQL
+}
+
+func (f *File) GetTarget() (*config.Target, error) {
+	target := config.GlobalCfg.GetTargetFor(f.Path)
+
+	// Has the model overridden the execution project it needs to run under?
+	if value := f.GetConfig("execution_project"); value.Type() == compilerInterface.StringVal {
+		target = target.Copy()
+		target.ExecutionProjects = []string{value.StringValue}
+	}
+
+	// Has the model overridden the project it writes into?
+	if value := f.GetConfig("project"); value.Type() == compilerInterface.StringVal {
+		target = target.Copy()
+
+		target.ProjectID = value.StringValue
+	}
+
+	// Has the model overridden the dataset it writes into?
+	if value := f.GetConfig("schema"); value.Type() == compilerInterface.StringVal {
+		target = target.Copy()
+
+		target.DataSet = value.StringValue
+	}
+
+	// Through project tag substitution, do we need to replace the project id?
+	switch value := f.GetConfig("tags"); value.Type() {
+	case compilerInterface.ListVal:
+		for _, tagValue := range value.ListValue {
+			if tagValue.Type() != compilerInterface.StringVal {
+				return nil, errors.New(fmt.Sprintf("model %s has a tag which is not a string in the 'name=value' format: %s", f.Name, tagValue))
+			}
+
+			if subs, found := target.ProjectSubstitutions[tagValue.StringValue]; found {
+				if sub, found := subs[target.ProjectID]; found {
+					target = target.Copy()
+					target.ProjectID = sub
+					break
+				}
+			}
+		}
+
+	case compilerInterface.StringVal:
+		if subs, found := target.ProjectSubstitutions[value.StringValue]; found {
+			if sub, found := subs[target.ProjectID]; found {
+				target = target.Copy()
+				target.ProjectID = sub
+				break
+			}
+		}
+	}
+
+	return target, nil
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"ddbt/compilerInterface"
+	"ddbt/config"
 	"ddbt/fs"
 )
 
@@ -82,7 +83,7 @@ func (e *ExecutionContext) CopyVariablesInto(ec compilerInterface.ExecutionConte
 	}
 }
 
-func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) error {
+func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType string) (*compilerInterface.Value, error) {
 	var upstream *fs.File
 
 	switch fileType {
@@ -98,19 +99,31 @@ func (e *ExecutionContext) RegisterUpstream(modelName string, fileType string) e
 		}
 
 	default:
-		return errors.New(fmt.Sprintf("unknown file type: %s", fileType))
+		return nil, errors.New(fmt.Sprintf("unknown file type: %s", fileType))
 	}
 
 	if upstream == nil {
-		return errors.New(fmt.Sprintf("Unable to find model `%s`", modelName))
+		return nil, errors.New(fmt.Sprintf("Unable to find model `%s`", modelName))
 	}
 
 	e.file.RecordDependencyOn(upstream)
-	return nil
+
+	target, err := upstream.GetTarget()
+	if err != nil {
+		return nil, err
+	}
+
+	return compilerInterface.NewString(
+		"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
+	), nil
 }
 
 func (e *ExecutionContext) FileName() string {
 	return e.file.Name
+}
+
+func (e *ExecutionContext) GetTarget() (*config.Target, error) {
+	return e.file.GetTarget()
 }
 
 func (e *ExecutionContext) MarkAsDynamicSQL() (*compilerInterface.Value, error) {

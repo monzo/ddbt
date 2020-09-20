@@ -34,7 +34,12 @@ func GetColumnValues(ec compilerInterface.ExecutionContext, caller compilerInter
 		query += " LIMIT " + strconv.Itoa(int(num))
 	}
 
-	rows, _, err := bigquery.GetRows(query)
+	target, err := ec.GetTarget()
+	if err != nil {
+		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
+	}
+
+	rows, _, err := bigquery.GetRows(query, target)
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("get_column_values query returned an error: %s", err))
 	}
@@ -79,7 +84,12 @@ func Unpivot(ec compilerInterface.ExecutionContext, caller compilerInterface.AST
 
 	excludeSet := listToSet(exclude)
 
-	columns, err := bigquery.GetColumnsFromTable(table)
+	target, err := ec.GetTarget()
+	if err != nil {
+		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
+	}
+
+	columns, err := bigquery.GetColumnsFromTable(table, target)
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to get the columns for %s: %s", table, err))
 	}

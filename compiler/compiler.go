@@ -55,3 +55,13 @@ func CompileModel(file *fs.File, gc *GlobalContext, isExecuting bool) error {
 
 	return err
 }
+
+func isOnlyCompilingSQL(ec compilerInterface.ExecutionContext) bool {
+	value := ec.GetVariable("execute")
+
+	if value.Type() == compilerInterface.BooleanValue {
+		return !value.BooleanValue
+	} else {
+		return true
+	}
+}

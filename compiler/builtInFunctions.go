@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"ddbt/compilerInterface"
-	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/utils"
 )
@@ -240,6 +239,14 @@ func noopMethod() compilerInterface.FunctionDef {
 }
 
 func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+	// This is dynamic because a reference _might_ change due to the tags in the referenced model when they are compiled
+	// thus we'll need to recompile _this_ model before executing it to pickup those changes
+	if isOnlyCompilingSQL(ec) {
+		if _, err := ec.MarkAsDynamicSQL(); err != nil {
+			return nil, err
+		}
+	}
+
 	values, err := requiredArgs(ec, caller, args, "ref", compilerInterface.StringVal)
 	if err != nil {
 		return nil, err
@@ -247,13 +254,7 @@ func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface
 
 	modelName := values[0].AsStringValue()
 
-	if err := ec.RegisterUpstream(modelName, fs.ModelFile); err != nil {
-		return nil, ec.ErrorAt(caller, err.Error())
-	}
-
-	return compilerInterface.NewString(
-		"`" + config.GlobalCfg.Target.ProjectID + "`.`" + config.GlobalCfg.Target.DataSet + "`.`" + modelName + "`",
-	), nil
+	return ec.RegisterUpstreamAndGetRef(modelName, fs.ModelFile)
 }
 
 type funcMap = map[string]compilerInterface.FunctionDef

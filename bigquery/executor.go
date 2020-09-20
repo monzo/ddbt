@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
@@ -15,34 +16,67 @@ import (
 )
 
 var (
-	client  *bigquery.Client
-	dataset *bigquery.Dataset
+	clientsMutex sync.Mutex
+	clients      map[string]*bigquery.Client
 )
 
 func Init(cfg *config.Config) (err error) {
-	client, err = bigquery.NewClient(
-		context.Background(),
-		cfg.Target.ProjectID,
-	)
+	clients = make(map[string]*bigquery.Client)
 
-	if err != nil {
+	if _, err := GetClientFor(cfg.Target.ProjectID); err != nil {
 		return err
 	}
 
-	dataset = client.Dataset(cfg.Target.DataSet)
-
 	return nil
+}
+
+func GetClientFor(project string) (*bigquery.Client, error) {
+	clientsMutex.Lock()
+	defer clientsMutex.Unlock()
+
+	client, found := clients[project]
+	if !found {
+		var err error
+		client, err = bigquery.NewClient(context.Background(), project)
+
+		if err != nil {
+			return nil, err
+		}
+
+		clients[project] = client
+	}
+
+	return client, nil
 }
 
 func Run(ctx context.Context, f *fs.File) (string, error) {
 	query := BuildQuery(f)
 
+	target, err := f.GetTarget()
+	if err != nil {
+		return "", err
+	}
+
+	switch {
+	case target.ProjectID == "":
+		return "", errors.New("no project ID defined to run query against")
+	case target.DataSet == "":
+		return "", errors.New("no dataset defined to run query against")
+	}
+
+	client, err := GetClientFor(target.RandExecutionProject())
+	if err != nil {
+		return "", err
+	}
+
+	dataset := client.DatasetInProject(target.ProjectID, target.DataSet)
+
 	q := client.Query(query)
-	q.Location = config.GlobalCfg.Target.Location
+	q.Location = target.Location
 
 	// Default read information
-	q.DefaultProjectID = config.GlobalCfg.Target.ProjectID
-	q.DefaultDatasetID = config.GlobalCfg.Target.DataSet
+	q.DefaultProjectID = target.ProjectID
+	q.DefaultDatasetID = target.DataSet
 	q.DisableQueryCache = true
 
 	// Output write information
@@ -116,15 +150,27 @@ func Quote(value string) string {
 	)
 }
 
-func GetRows(query string) ([][]Value, Schema, error) {
+func GetRows(query string, target *config.Target) ([][]Value, Schema, error) {
 	ctx := context.Background()
 
+	switch {
+	case target.ProjectID == "":
+		return nil, nil, errors.New("no project ID defined to run query against")
+	case target.DataSet == "":
+		return nil, nil, errors.New("no dataset defined to run query against")
+	}
+
+	client, err := GetClientFor(target.RandExecutionProject())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	q := client.Query(query)
-	q.Location = config.GlobalCfg.Target.Location
+	q.Location = target.Location
 
 	// Default read information
-	q.DefaultProjectID = config.GlobalCfg.Target.ProjectID
-	q.DefaultDatasetID = config.GlobalCfg.Target.DataSet
+	q.DefaultProjectID = target.ProjectID
+	q.DefaultDatasetID = target.DataSet
 
 	job, err := q.Run(ctx)
 	if err != nil {
@@ -168,8 +214,8 @@ func GetRows(query string) ([][]Value, Schema, error) {
 	return rows, schema, nil
 }
 
-func GetColumnsFromTable(table string) (Schema, error) {
-	_, schema, err := GetRows(fmt.Sprintf("SELECT * FROM %s LIMIT 0"))
+func GetColumnsFromTable(table string, target *config.Target) (Schema, error) {
+	_, schema, err := GetRows(fmt.Sprintf("SELECT * FROM %s LIMIT 0", table), target)
 	if err != nil {
 		return nil, err
 	}

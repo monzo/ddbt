@@ -242,7 +242,8 @@ func (pb *ProgressBar) NewStatusRow() *StatusRow {
 	pb.statusRowMutex.Lock()
 	defer pb.statusRowMutex.Unlock()
 
-	sr := &StatusRow{isIdle: true, changed: time.Now()}
+	sr := &StatusRow{}
+	sr.SetIdle()
 	pb.statusRows = append(pb.statusRows, sr)
 
 	return sr
