@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 
 	"ddbt/bigquery"
@@ -11,12 +12,12 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(showCmd)
+	rootCmd.AddCommand(copyCommand)
 }
 
-var showCmd = &cobra.Command{
-	Use:   "show [model name]",
-	Short: "Shows the SQL that would be executed for the given model",
+var copyCommand = &cobra.Command{
+	Use:   "copy [model name]",
+	Short: "Copies the SQL that would be executed for the given model into your clipboard",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fileSystem, gc := compileAllModels()
@@ -34,6 +35,11 @@ var showCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println(bigquery.BuildQuery(model))
+		if err := clipboard.WriteAll(bigquery.BuildQuery(model)); err != nil {
+			fmt.Printf("❌ Unable to copy query into your clipboard: %s\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("📎 Query has been copied into your clipboard\n")
 	},
 }

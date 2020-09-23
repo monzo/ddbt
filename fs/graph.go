@@ -157,6 +157,37 @@ func (g *Graph) addDownstreamModels(file *File, visited map[*File]struct{}) {
 	}
 }
 
+// Find all tests which reference the models in the existing graph
+// and add them to the graph
+//
+// returns the tests
+func (g *Graph) AddReferencingTests() []*File {
+	foundTest := make(map[*File]struct{})
+
+	for _, node := range g.nodes {
+		if node.file.Type != ModelFile {
+			continue
+		}
+
+		for downstream := range node.file.downstreams {
+			if downstream.Type != TestFile {
+				continue
+			}
+
+			downstreamNode := g.getNodeFor(downstream)
+			g.edge(node, downstreamNode)
+			foundTest[downstream] = struct{}{}
+		}
+	}
+
+	tests := make([]*File, 0, len(foundTest))
+	for test := range foundTest {
+		tests = append(tests, test)
+	}
+
+	return tests
+}
+
 func (g *Graph) Len() int {
 	return len(g.nodes)
 }

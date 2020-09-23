@@ -13,6 +13,7 @@ type FileSystem struct {
 	files       []*File
 	macroLookup map[string]*File
 	modelLookup map[string]*File
+	tests       []*File
 }
 
 func ReadFileSystem() (*FileSystem, error) {
@@ -20,6 +21,7 @@ func ReadFileSystem() (*FileSystem, error) {
 		files:       make([]*File, 0),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
+		tests:       make([]*File, 0),
 	}
 
 	// FIXME: disabled for a bit
@@ -35,7 +37,11 @@ func ReadFileSystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	fmt.Printf("🔎 Found %d models, %d macros\n", len(fs.files)-len(fs.macroLookup), len(fs.macroLookup))
+	if err := fs.scanDirectory("./tests/", TestFile); err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("🔎 Found %d models, %d macros, %d tests\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests))
 
 	return fs, nil
 }
@@ -116,6 +122,11 @@ func (fs *FileSystem) scanDirectory(path string, fileType FileType) error {
 			if err := fs.mapModelLookupOptions(file); err != nil {
 				return err
 			}
+
+		case TestFile:
+			if err := fs.mapTestLookupOptions(file); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -162,6 +173,12 @@ func (fs *FileSystem) mapModelLookupOptions(file *File) error {
 	return nil
 }
 
+// Map tests into our lookup options
+func (fs *FileSystem) mapTestLookupOptions(file *File) error {
+	fs.tests = append(fs.tests, file)
+	return nil
+}
+
 func (fs *FileSystem) NumberFiles() int {
 	return len(fs.files)
 }
@@ -197,6 +214,16 @@ func (fs *FileSystem) Macros() []*File {
 	}
 
 	return macros
+}
+
+// Returns a list of tests
+func (fs *FileSystem) Tests() []*File {
+	tests := make([]*File, 0, len(fs.tests))
+	for _, macro := range fs.tests {
+		tests = append(tests, macro)
+	}
+
+	return tests
 }
 
 func (fs *FileSystem) AllFiles() []*File {

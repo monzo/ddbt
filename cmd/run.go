@@ -20,7 +20,7 @@ var ModelFilter string
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	runCmd.Flags().StringVarP(&ModelFilter, "model", "m", "", "Select which model to run")
+	runCmd.Flags().StringVarP(&ModelFilter, "model", "m", "", "Select which model(s) to run")
 }
 
 var runCmd = &cobra.Command{
@@ -53,6 +53,7 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
 	compileMacros(fileSystem, gc)
 	compileFiles(fileSystem, gc)
+	compileTests(fileSystem, gc)
 
 	return fileSystem, gc
 }
@@ -71,6 +72,7 @@ func parseFiles(fileSystem *fs.FileSystem) {
 			}
 			pb.Increment()
 		},
+		nil,
 	)
 }
 
@@ -89,6 +91,7 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 			}
 			pb.Increment()
 		},
+		nil,
 	)
 }
 
@@ -108,6 +111,27 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 
 			pb.Increment()
 		},
+		nil,
+	)
+}
+
+func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
+	pb := utils.NewProgressBar("🧪 Compiling Tests", len(fileSystem.Tests()))
+	defer pb.Stop()
+
+	fs.ProcessFiles(
+		fileSystem.Tests(),
+		func(file *fs.File) {
+			err := compiler.CompileModel(file, gc, false)
+			if err != nil {
+				pb.Stop()
+				fmt.Printf("❌ Unable to compile %s %s: %s\n", file.Type, file.Name, err)
+				os.Exit(1)
+			}
+
+			pb.Increment()
+		},
+		nil,
 	)
 }
 

@@ -195,6 +195,23 @@ func (f *File) IsDynamicSQL() bool {
 func (f *File) GetTarget() (*config.Target, error) {
 	target := config.GlobalCfg.GetTargetFor(f.Path)
 
+	// Tests may not define these, so we can pull them from the model they are being tested against
+	if f.Type == TestFile && (target.ProjectID == "" || target.DataSet == "") {
+		f.Mutex.Lock()
+		if len(f.upstreams) > 0 {
+			for upstream := range f.upstreams {
+				upstreamTarget, err := upstream.GetTarget()
+				if err != nil {
+					return nil, err
+				}
+
+				target = upstreamTarget
+				break
+			}
+		}
+		f.Mutex.Unlock()
+	}
+
 	// Has the model overridden the execution project it needs to run under?
 	if value := f.GetConfig("execution_project"); value.Type() == compilerInterface.StringVal {
 		target = target.Copy()

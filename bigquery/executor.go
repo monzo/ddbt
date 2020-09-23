@@ -52,6 +52,10 @@ func GetClientFor(project string) (*bigquery.Client, error) {
 func Run(ctx context.Context, f *fs.File) (string, error) {
 	query := BuildQuery(f)
 
+	if strings.TrimSpace(query) == "" {
+		return "", nil
+	}
+
 	target, err := f.GetTarget()
 	if err != nil {
 		return "", err
@@ -148,6 +152,54 @@ func Quote(value string) string {
 		"\\'",
 		-1,
 	)
+}
+
+func NumberRows(query string, target *config.Target) (uint64, error) {
+	ctx := context.Background()
+
+	switch {
+	case target.ProjectID == "":
+		return 0, errors.New("no project ID defined to run query against")
+	case target.DataSet == "":
+		return 0, errors.New("no dataset defined to run query against")
+	}
+
+	client, err := GetClientFor(target.RandExecutionProject())
+	if err != nil {
+		return 0, err
+	}
+
+	q := client.Query(query)
+	q.Location = target.Location
+
+	// Default read information
+	q.DefaultProjectID = target.ProjectID
+	q.DefaultDatasetID = target.DataSet
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Unable to run query: %s", err))
+	}
+
+	status, err := job.Wait(ctx)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Error executing: %s", err))
+	}
+
+	if status.State != bigquery.Done {
+		return 0, errors.New(fmt.Sprintf("Exuection job %s in state %s", job.ID(), status.State))
+	}
+
+	if err := status.Err(); err != nil {
+		return 0, errors.New(fmt.Sprintf("Job result in an error: %s", err))
+	}
+
+	itr, err := job.Read(ctx)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Job result in an error: %s", err))
+	}
+
+	return itr.TotalRows, nil
 }
 
 func GetRows(query string, target *config.Target) ([][]Value, Schema, error) {

@@ -42,6 +42,7 @@ func CompileModel(file *fs.File, gc *GlobalContext, isExecuting bool) error {
 	ec.SetVariable("target", compilerInterface.NewMap(map[string]*compilerInterface.Value{
 		"name":    compilerInterface.NewString(config.GlobalCfg.Target.Name),
 		"schema":  compilerInterface.NewString(target.DataSet),
+		"dataset": compilerInterface.NewString(target.DataSet),
 		"type":    compilerInterface.NewString("bigquery"),
 		"threads": compilerInterface.NewNumber(float64(target.Threads)),
 		"project": compilerInterface.NewString(target.ProjectID),
