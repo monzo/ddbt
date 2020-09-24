@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ var ModelFilter string
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	runCmd.Flags().StringVarP(&ModelFilter, "model", "m", "", "Select which model(s) to run")
+	runCmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
 }
 
 var runCmd = &cobra.Command{
@@ -142,39 +143,47 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
 	graph := fs.NewGraph()
 
 	if modelFilter != "" {
-		// Check if we want all upstreams
-		allUpstreams := modelFilter[0] == '+'
-		if allUpstreams {
-			modelFilter = modelFilter[1:]
-		}
-
-		allDownstreams := modelFilter[len(modelFilter)-1] == '+'
-		if allDownstreams {
-			modelFilter = modelFilter[:len(modelFilter)-1]
-		}
-
-		model := fileSystem.Model(modelFilter)
-		if model == nil {
-			pb.Stop()
-			fmt.Printf("❌ Unable to find model: %s\n", modelFilter)
-			os.Exit(1)
-		}
-
-		graph.AddNode(model)
-
-		if allUpstreams {
-			if err := graph.AddNodeAndUpstreams(model); err != nil {
+		if strings.HasPrefix(modelFilter, "tag:") {
+			if err := graph.AddFilesWithTag(fileSystem, modelFilter[4:]); err != nil {
 				pb.Stop()
-				fmt.Printf("❌ %s\n", err)
+				fmt.Printf("❌ Unable to add models filtered by tag: %s", err)
 				os.Exit(1)
 			}
-		}
+		} else {
+			// Check if we want all upstreams
+			allUpstreams := modelFilter[0] == '+'
+			if allUpstreams {
+				modelFilter = modelFilter[1:]
+			}
 
-		if allDownstreams {
-			if err := graph.AddNodeAndDownstreams(model); err != nil {
+			allDownstreams := modelFilter[len(modelFilter)-1] == '+'
+			if allDownstreams {
+				modelFilter = modelFilter[:len(modelFilter)-1]
+			}
+
+			model := fileSystem.Model(modelFilter)
+			if model == nil {
 				pb.Stop()
-				fmt.Printf("❌ %s\n", err)
+				fmt.Printf("❌ Unable to find model: %s\n", modelFilter)
 				os.Exit(1)
+			}
+
+			graph.AddNode(model)
+
+			if allUpstreams {
+				if err := graph.AddNodeAndUpstreams(model); err != nil {
+					pb.Stop()
+					fmt.Printf("❌ %s\n", err)
+					os.Exit(1)
+				}
+			}
+
+			if allDownstreams {
+				if err := graph.AddNodeAndDownstreams(model); err != nil {
+					pb.Stop()
+					fmt.Printf("❌ %s\n", err)
+					os.Exit(1)
+				}
 			}
 		}
 	} else {
@@ -188,7 +197,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
 	pb.Increment()
 
 	if graph.Len() == 0 {
-		fmt.Printf("❌ Empty DAG generated for model: %s\n", modelFilter)
+		fmt.Printf("❌ Empty DAG generated for model filter: %s\n", modelFilter)
 		os.Exit(1)
 	}
 

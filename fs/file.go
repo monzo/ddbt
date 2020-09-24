@@ -153,6 +153,16 @@ func (f *File) ConfigObject() *compilerInterface.Value {
 			f.cfgMutex.Unlock()
 		}
 
+		if tagsList := f.GetConfig("tags"); tagsList.Type() == compilerInterface.ListVal && tagsList.ListValue != nil {
+			f.cfgMutex.Lock()
+			for _, tagVal := range tagsList.ListValue {
+				if tagVal.Type() == compilerInterface.StringVal {
+					f.FolderConfig.Tags = append(f.FolderConfig.Tags, tagVal.StringValue)
+				}
+			}
+			f.cfgMutex.Unlock()
+		}
+
 		if enabledValue := f.GetConfig("enabled"); enabledValue.Type() == compilerInterface.BooleanValue && !enabledValue.BooleanValue {
 			// This model is not enable and should return undefined (this stops the execution of the AST for the model)
 			return compilerInterface.NewReturnValue(compilerInterface.NewUndefined()), nil
@@ -245,7 +255,15 @@ func (f *File) GetTarget() (*config.Target, error) {
 				if sub, found := subs[target.ProjectID]; found {
 					target = target.Copy()
 					target.ProjectID = sub
-					break
+				}
+			}
+
+			if target.ReadUpstream != nil {
+				if subs, found := target.ReadUpstream.ProjectSubstitutions[tagValue.StringValue]; found {
+					if sub, found := subs[target.ReadUpstream.ProjectID]; found {
+						target = target.Copy()
+						target.ReadUpstream.ProjectID = sub
+					}
 				}
 			}
 		}
@@ -255,7 +273,15 @@ func (f *File) GetTarget() (*config.Target, error) {
 			if sub, found := subs[target.ProjectID]; found {
 				target = target.Copy()
 				target.ProjectID = sub
-				break
+			}
+		}
+
+		if target.ReadUpstream != nil {
+			if subs, found := target.ReadUpstream.ProjectSubstitutions[value.StringValue]; found {
+				if sub, found := subs[target.ReadUpstream.ProjectID]; found {
+					target = target.Copy()
+					target.ReadUpstream.ProjectID = sub
+				}
 			}
 		}
 	}
@@ -270,6 +296,13 @@ func (f *File) GetMaterialization() string {
 	return f.FolderConfig.Materialized
 }
 
+func (f *File) GetTags() []string {
+	f.cfgMutex.Lock()
+	defer f.cfgMutex.Unlock()
+
+	return f.FolderConfig.Tags
+}
+
 func (f *File) MarkAsInDAG() {
 	f.cfgMutex.Lock()
 	defer f.cfgMutex.Unlock()
@@ -282,4 +315,16 @@ func (f *File) IsInDAG() bool {
 	defer f.cfgMutex.Unlock()
 
 	return f.isInDAG
+}
+
+func (f *File) HasTag(tag string) bool {
+	tags := f.GetTags()
+
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+
+	return false
 }

@@ -86,6 +86,45 @@ func (g *Graph) AddNode(file *File) {
 	g.getNodeFor(file)
 }
 
+func (g *Graph) addNodeAndUpstreamsWithTag(file *File, tag string, visited map[*File]struct{}) {
+	if _, found := visited[file]; found {
+		return
+	}
+	visited[file] = struct{}{}
+
+	node := g.getNodeFor(file)
+
+	for upstream := range file.upstreams {
+		if upstream.HasTag(tag) {
+			upstreamNode := g.getNodeFor(upstream)
+			g.edge(upstreamNode, node)
+
+			g.addNodeAndUpstreamsWithTag(file, tag, visited)
+		}
+	}
+}
+
+func (g *Graph) AddFilesWithTag(fs *FileSystem, tag string) error {
+	visited := make(map[*File]struct{})
+
+	for _, file := range fs.AllFiles() {
+		if file.HasTag(tag) {
+			g.addNodeAndUpstreamsWithTag(file, tag, visited)
+		}
+	}
+
+	// Check for circular dependencies & all nodes without upstreams
+	for file := range visited {
+		node := g.getNodeFor(file)
+
+		if node.upstreamContains(node) {
+			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+		}
+	}
+
+	return nil
+}
+
 // Adds a file to the graph which acts as
 func (g *Graph) AddNodeAndUpstreams(file *File) error {
 	visited := make(map[*File]struct{})

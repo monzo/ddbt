@@ -1,13 +1,15 @@
 package tests
 
 import (
+	"fmt"
+	"testing"
+
+	"ddbt/bigquery"
 	"ddbt/compiler"
 	"ddbt/compilerInterface"
 	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/jinja"
-	"fmt"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,9 +88,9 @@ func compileFromRaw(t *testing.T, raw string) string {
 	finalAST, err := file.SyntaxTree.Execute(ec)
 	require.NoError(t, err)
 	require.NotNil(t, finalAST, "Output AST is nil")
-	//require.Equal(t, compilerInterface.StringVal, finalAST.Type())
+	file.CompiledContents = finalAST.AsStringValue()
 
-	return finalAST.AsStringValue()
+	return bigquery.BuildQuery(file)
 }
 
 func assertCompileOutput(t *testing.T, expected, input string) {

@@ -41,6 +41,10 @@ func GetFolderConfig(path string) ModelConfig {
 		}
 	}
 
+	newSlice := make([]string, len(config.Tags))
+	copy(newSlice, config.Tags)
+	config.Tags = newSlice
+
 	return config
 }
 

@@ -18,7 +18,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(testCmd)
-	testCmd.Flags().StringVarP(&ModelFilter, "model", "m", "", "Select which model(s) to test")
+	testCmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to test")
 }
 
 var testCmd = &cobra.Command{

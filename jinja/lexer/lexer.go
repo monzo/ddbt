@@ -416,7 +416,10 @@ func (l *lexer) readMultilineStringToken() (*Token, error) {
 		return l.newTokenWithValue(StringToken, ""), nil
 	}
 
-	// Consume the third '
+	// Consume the second and third '
+	if err := l.readRune(); err != nil {
+		return nil, err
+	}
 	if err := l.readRune(); err != nil {
 		return nil, err
 	}
@@ -428,11 +431,27 @@ func (l *lexer) readMultilineStringToken() (*Token, error) {
 	for {
 		for l.currentRune != '\'' && l.currentRune != 0 {
 			if exitCount > 0 {
-				exitCount = 0
 				buf.WriteString(strings.Repeat("'", exitCount))
+				exitCount = 0
 			}
 
-			buf.WriteRune(l.currentRune)
+			if l.currentRune == '\\' && l.nextRune == '\'' {
+				// Consume the escape
+				if err := l.readRune(); err != nil {
+					return nil, err
+				}
+
+				buf.WriteRune('\'')
+			} else if l.currentRune == '\\' && l.nextRune == '\\' {
+				// Consume the escape
+				if err := l.readRune(); err != nil {
+					return nil, err
+				}
+
+				buf.WriteRune('\\')
+			} else {
+				buf.WriteRune(l.currentRune)
+			}
 
 			if err := l.readRune(); err != nil {
 				return nil, err

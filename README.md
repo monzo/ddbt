@@ -11,6 +11,7 @@ projects (3000+ data models). This project attempts to be a direct drop in repla
 - `ddbt test` will run all tests referencing all your models, or those filtered for, in your project against your data warehouse
 - `ddbt show my_model` will output the compiled SQL to the terminal
 - `ddbt copy my_model` will copy the compiled SQL into your clipboard
+- `ddbt show-dag` will output the order of how the models will execute
 
 ### Global Arguments
 - `--models model_filter` _or_ `-m model_filter`: Instead of running for every model in your project, DDBT will only execute against the requested models. See filters below for what is accepted for `my_model`
@@ -26,3 +27,4 @@ Currently DDBT supports the following syntax options:
 - `-m +my_model`: DDBT will run against `my_model` and all upstreams referenced by it
 - `-m my_model+`: DDBT will run against `my_model` and all downstreams that referenced it
 - `-m +my_model+`: DDBT will run against `my_model` and both all upstreams and downstreams.
+- `-m tag:tagValue`: DDBT will only execute models which have a tag which is equal to `tagValue`
