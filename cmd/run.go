@@ -203,7 +203,7 @@ func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) {
 
 	graph.Execute(func(file *fs.File) {
 		if file.Type == fs.ModelFile && file.GetMaterialization() != "ephemeral" {
-			if file.IsDynamicSQL() {
+			if file.IsDynamicSQL() || upstreamProfile != "" {
 				if err := compiler.CompileModel(file, globalContext, true); err != nil {
 					pb.Stop()
 					fmt.Printf("❌ %s\n", err)

@@ -119,10 +119,18 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 	}
 
 	switch upstream.GetMaterialization() {
-	case "table":
-		return compilerInterface.NewString(
-			"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
-		), nil
+	case "table", "incremental":
+		// If "--upstream=target" has been provided and this model is not in the DAG, then we read from the upstream
+		// target, rather than the target defined in "--target=target"
+		if target.ReadUpstream != nil && !upstream.IsInDAG() {
+			return compilerInterface.NewString(
+				"`" + target.ReadUpstream.ProjectID + "`.`" + target.ReadUpstream.DataSet + "`.`" + modelName + "`",
+			), nil
+		} else {
+			return compilerInterface.NewString(
+				"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
+			), nil
+		}
 
 	case "ephemeral":
 		err := CompileModel(upstream, e.globalContext, e.isExecuting)
@@ -137,11 +145,6 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 		e.file.Mutex.Unlock()
 
 		return compilerInterface.NewString(cteName), nil
-
-	case "incremental":
-		return compilerInterface.NewString(
-			"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
-		), nil
 
 	default:
 		return nil, errors.New(fmt.Sprintf("unknown materialized config '%s' in model '%s'", upstream.GetMaterialization(), upstream.Name))

@@ -10,6 +10,8 @@ type Target struct {
 	Threads              int
 	ProjectSubstitutions map[string]map[string]string
 	ExecutionProjects    []string
+
+	ReadUpstream *Target // If the reference is outside this DAG, this is the target we should read from
 }
 
 func (t *Target) Copy() *Target {
@@ -27,6 +29,11 @@ func (t *Target) Copy() *Target {
 		executionProjects[i] = project
 	}
 
+	var defaultUpstream *Target
+	if t.ReadUpstream != nil {
+		defaultUpstream = t.ReadUpstream.Copy()
+	}
+
 	return &Target{
 		Name:                 t.Name,
 		ProjectID:            t.ProjectID,
@@ -35,6 +42,7 @@ func (t *Target) Copy() *Target {
 		Threads:              t.Threads,
 		ProjectSubstitutions: projectSubs,
 		ExecutionProjects:    executionProjects,
+		ReadUpstream:         defaultUpstream,
 	}
 }
 

@@ -18,14 +18,16 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	targetProfile string
-	threads       int
+	targetProfile   string
+	upstreamProfile string
+	threads         int
 )
 
 func init() {
 	cobra.OnInitialize(initDDBT)
 
 	rootCmd.PersistentFlags().StringVarP(&targetProfile, "target", "t", "", "Which target profile to use")
+	rootCmd.PersistentFlags().StringVarP(&upstreamProfile, "upstream", "u", "", "Which target profile to use when reading data outside the current DAG")
 	rootCmd.PersistentFlags().IntVar(&threads, "threads", 0, "How many threads to execute with")
 }
 
@@ -38,7 +40,7 @@ func Execute() {
 
 func initDDBT() {
 	// Read the project config
-	cfg, err := config.Read(targetProfile, threads, compiler.CompileStringWithCache)
+	cfg, err := config.Read(targetProfile, upstreamProfile, threads, compiler.CompileStringWithCache)
 	if err != nil {
 		fmt.Printf("❌ Unable to load config: %s\n", err)
 		os.Exit(1)

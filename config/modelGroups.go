@@ -29,7 +29,7 @@ type modelGroupConfig struct {
 
 type modelGroupConfigFile = map[string]modelGroupConfig
 
-func readModelGroupConfig(fileName string, targetName string, baseTarget *Target) (map[string]*Target, error) {
+func readModelGroupConfig(fileName string, targetName string, defaultTarget string, baseTarget *Target) (map[string]*Target, error) {
 	m := make(modelGroupConfigFile)
 
 	bytes, err := ioutil.ReadFile(fileName)
@@ -51,43 +51,64 @@ func readModelGroupConfig(fileName string, targetName string, baseTarget *Target
 		}
 
 		target := baseTarget.Copy()
-		if targetCfg.Project != "" {
-			target.ProjectID = targetCfg.Project
+
+		if err := updateTargetFromModelGroupConfig(target, targetName, targetCfg); err != nil {
+			return nil, err
 		}
 
-		// Data set is either a string, or "from_env" which means it's auto generated using the users username
-		if targetCfg.Dataset != nil {
-			switch v := targetCfg.Dataset.(type) {
-			case string:
-				target.DataSet = v
-
-			case map[interface{}]interface{}:
-				if b, ok := v["from_env"].(bool); ok && b {
-					u, err := user.Current()
-					if err != nil {
-						return nil, err
-					}
-
-					target.DataSet = fmt.Sprintf("dbt_%s_%s", u.Username, targetName)
-				} else {
-					return nil, errors.New("expected dataset to be string or { 'from_env': true }")
-				}
-
-			default:
-				return nil, errors.New("expected dataset to be string or { 'from_env': true }")
+		if defaultTarget != "" {
+			defaultTargetCfg, found := targets.Targets[defaultTarget]
+			if !found {
+				fmt.Printf("⚠️ Model group `%s` does not have a target for `%s`\n", modelGroup, targetName)
+				continue
 			}
-		}
 
-		if targetCfg.ExecutionProjects != nil {
-			target.ExecutionProjects = targetCfg.ExecutionProjects
-		}
-
-		if targetCfg.ProjectSubstitutions != nil {
-			target.ProjectSubstitutions = targetCfg.ProjectSubstitutions
+			if err := updateTargetFromModelGroupConfig(target.ReadUpstream, defaultTarget, defaultTargetCfg); err != nil {
+				return nil, err
+			}
 		}
 
 		rtn[modelGroup] = target
 	}
 
 	return rtn, nil
+}
+
+func updateTargetFromModelGroupConfig(target *Target, targetName string, targetCfg modelGroupTarget) error {
+	if targetCfg.Project != "" {
+		target.ProjectID = targetCfg.Project
+	}
+
+	// Data set is either a string, or "from_env" which means it's auto generated using the users username
+	if targetCfg.Dataset != nil {
+		switch v := targetCfg.Dataset.(type) {
+		case string:
+			target.DataSet = v
+
+		case map[interface{}]interface{}:
+			if b, ok := v["from_env"].(bool); ok && b {
+				u, err := user.Current()
+				if err != nil {
+					return err
+				}
+
+				target.DataSet = fmt.Sprintf("dbt_%s_%s", u.Username, targetName)
+			} else {
+				return errors.New("expected dataset to be string or { 'from_env': true }")
+			}
+
+		default:
+			return errors.New("expected dataset to be string or { 'from_env': true }")
+		}
+	}
+
+	if targetCfg.ExecutionProjects != nil {
+		target.ExecutionProjects = targetCfg.ExecutionProjects
+	}
+
+	if targetCfg.ProjectSubstitutions != nil {
+		target.ProjectSubstitutions = targetCfg.ProjectSubstitutions
+	}
+
+	return nil
 }

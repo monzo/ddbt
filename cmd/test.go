@@ -115,7 +115,7 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 			statusEmoji = '🚧'
 
 		case results.err != nil:
-			statusText = "Error"
+			statusText = fmt.Sprintf("Error: %s", results.err)
 			statusEmoji = '🔴'
 
 		case results.rows > 0:
@@ -146,5 +146,7 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 		} else {
 			fmt.Printf("📎 Test Query for %s has been copied into your clipboard\n\n", firstError.name)
 		}
+
+		os.Exit(2) // Exit with a test error
 	}
 }

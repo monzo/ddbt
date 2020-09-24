@@ -19,21 +19,25 @@ var showCmd = &cobra.Command{
 	Short: "Shows the SQL that would be executed for the given model",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fileSystem, gc := compileAllModels()
+		fmt.Println(getModelSQL(args[0]))
+	},
+}
 
-		model := fileSystem.Model(args[0])
-		if model == nil {
-			fmt.Printf("❌ Model %s not found\n", args[0])
+func getModelSQL(modelName string) string {
+	fileSystem, gc := compileAllModels()
+
+	model := fileSystem.Model(modelName)
+	if model == nil {
+		fmt.Printf("❌ Model %s not found\n", modelName)
+		os.Exit(1)
+	}
+
+	if model.IsDynamicSQL() || upstreamProfile != "" {
+		if err := compiler.CompileModel(model, gc, true); err != nil {
+			fmt.Printf("❌ Unable to compile dynamic SQL: %s\n", err)
 			os.Exit(1)
 		}
+	}
 
-		if model.IsDynamicSQL() {
-			if err := compiler.CompileModel(model, gc, true); err != nil {
-				fmt.Printf("❌ Unable to compile dynamic SQL: %s\n", err)
-				os.Exit(1)
-			}
-		}
-
-		fmt.Println(bigquery.BuildQuery(model))
-	},
+	return bigquery.BuildQuery(model)
 }

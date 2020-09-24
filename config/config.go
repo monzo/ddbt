@@ -38,7 +38,7 @@ func (c *Config) GetTargetFor(path string) *Target {
 
 var GlobalCfg *Config
 
-func Read(targetProfile string, threads int, strExecutor func(s string) (string, error)) (*Config, error) {
+func Read(targetProfile string, upstreamProfile string, threads int, strExecutor func(s string) (string, error)) (*Config, error) {
 	project, err := readDBTProject()
 	if err != nil {
 		return nil, err
@@ -87,8 +87,26 @@ func Read(targetProfile string, threads int, strExecutor func(s string) (string,
 		},
 	}
 
+	if upstreamProfile != "" {
+		output, found := profile.Outputs[upstreamProfile]
+		if !found {
+			return nil, errors.New(fmt.Sprintf("Output `%s` of profile `%s` not found", upstreamProfile, project.Profile))
+		}
+
+		GlobalCfg.Target.ReadUpstream = &Target{
+			Name:      upstreamProfile,
+			ProjectID: output.Project,
+			DataSet:   output.Dataset,
+			Location:  output.Location,
+			Threads:   threads,
+
+			ProjectSubstitutions: make(map[string]map[string]string),
+			ExecutionProjects:    make([]string, 0),
+		}
+	}
+
 	if appConfig.ModelGroupsFile != "" {
-		modelGroups, err := readModelGroupConfig(appConfig.ModelGroupsFile, targetProfile, GlobalCfg.Target)
+		modelGroups, err := readModelGroupConfig(appConfig.ModelGroupsFile, targetProfile, upstreamProfile, GlobalCfg.Target)
 		if err != nil {
 			return nil, err
 		}

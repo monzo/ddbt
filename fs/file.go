@@ -46,6 +46,7 @@ type File struct {
 
 	//ctesMutex     sync.Mutex
 	EphemeralCTES map[string]*File
+	isInDAG       bool
 }
 
 func newFile(path string, file os.FileInfo, fileType FileType) *File {
@@ -267,4 +268,18 @@ func (f *File) GetMaterialization() string {
 	defer f.cfgMutex.Unlock()
 
 	return f.FolderConfig.Materialized
+}
+
+func (f *File) MarkAsInDAG() {
+	f.cfgMutex.Lock()
+	defer f.cfgMutex.Unlock()
+
+	f.isInDAG = true
+}
+
+func (f *File) IsInDAG() bool {
+	f.cfgMutex.Lock()
+	defer f.cfgMutex.Unlock()
+
+	return f.isInDAG
 }

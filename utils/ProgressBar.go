@@ -175,6 +175,11 @@ func (pb *ProgressBar) String(termWidth int) string {
 	completed := pb.completedItems // Because this is atomically updated, grab a local reference
 	percentage := float64(completed) / float64(pb.numberItems)
 
+	if percentage != percentage {
+		// If we have zero items, then that progress bar is always at 100%
+		percentage = 1
+	}
+
 	var builder strings.Builder
 
 	// Draw the right hand edge first, so we know how many columns it will be in size

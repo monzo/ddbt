@@ -35,6 +35,7 @@ func NewGraph() *Graph {
 
 func (g *Graph) getNodeFor(file *File) *Node {
 	node := g.nodes[file]
+
 	if node == nil {
 		node = &Node{
 			file:            file,
@@ -43,6 +44,8 @@ func (g *Graph) getNodeFor(file *File) *Node {
 		}
 
 		g.nodes[file] = node
+
+		file.MarkAsInDAG()
 	}
 
 	return node
