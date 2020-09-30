@@ -88,14 +88,13 @@ func (pb *ProgressBar) draw(isFinalDraw bool) {
 
 	for i := 0; i < pb.statusRowsLastRender; i++ {
 		// Clear the line
-		builder.WriteRune('\r')
-		builder.WriteString(strings.Repeat(" ", termWidth))
+		builder.WriteString("\r\033[K") // reset to the beginning of the line and reset it
 
 		// Move up a line
 		builder.WriteString("\x1b[1A\x1b[2K")
 	}
 
-	builder.WriteRune('\r')
+	builder.WriteString("\r\033[K") // reset to the beginning of the line and reset it
 	builder.WriteString(pb.String(termWidth))
 
 	if !isFinalDraw {

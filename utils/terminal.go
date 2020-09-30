@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
@@ -42,4 +43,9 @@ func TerminalWidth() (int, error) {
 	}
 
 	return int(w.Col), nil
+}
+
+func ClearTerminal() {
+	// Clear the screen and then move the cursor to column 1, row 1
+	fmt.Print("\033[2J\033[1;1H")
 }
