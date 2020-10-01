@@ -35,11 +35,13 @@ var testCmd = &cobra.Command{
 		// Add all tests which reference the graph
 		tests := graph.AddReferencingTests()
 
-		executeTests(tests, globalContext)
+		if executeTests(tests, globalContext, graph) {
+			os.Exit(2) // Exit with a test error
+		}
 	},
 }
 
-func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
+func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext, graph *fs.Graph) bool {
 	pb := utils.NewProgressBar("🔬 Running Tests", len(tests))
 
 	_, cancel := context.WithCancel(context.Background())
@@ -47,6 +49,7 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 	var m sync.Mutex
 	widestTestName := 0
 	type testResult struct {
+		file  *fs.File
 		name  string
 		rows  uint64
 		err   error
@@ -54,9 +57,9 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 	}
 	testResults := make(map[*fs.File]testResult)
 
-	fs.ProcessFiles(
+	_ = fs.ProcessFiles(
 		tests,
-		func(file *fs.File) {
+		func(file *fs.File) error {
 			if file.IsDynamicSQL() {
 				if err := compiler.CompileModel(file, globalContext, true); err != nil {
 					pb.Stop()
@@ -81,6 +84,7 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 
 				m.Lock()
 				testResults[file] = testResult{
+					file:  file,
 					name:  file.Name,
 					rows:  rows,
 					err:   err,
@@ -94,6 +98,8 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 			}
 
 			pb.Increment()
+
+			return nil
 		},
 		pb,
 	)
@@ -105,6 +111,9 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 	fmt.Printf("\nTest Results:\n")
 	for test, results := range testResults {
 		results := results
+
+		// Force this test to be-rerun in future watch loops
+		graph.UnmarkFileAsRun(results.file)
 
 		var statusText string
 		var statusEmoji rune
@@ -147,6 +156,8 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext) {
 			fmt.Printf("📎 Test Query for %s has been copied into your clipboard\n\n", firstError.name)
 		}
 
-		os.Exit(2) // Exit with a test error
+		return true
 	}
+
+	return false
 }

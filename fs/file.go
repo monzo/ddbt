@@ -34,6 +34,7 @@ type File struct {
 	SyntaxTree       ast.AST
 	isDynamicSQL     bool // does this need recompiling as part of the DAG?
 	CompiledContents string
+	NeedsRecompile   bool // used in watch mode
 
 	PrereadFileContents string // Used for testing
 
@@ -188,6 +189,19 @@ func (f *File) RecordDependencyOn(upstream *File) {
 	upstream.Mutex.Lock()
 	upstream.downstreams[f] = struct{}{}
 	upstream.Mutex.Unlock()
+}
+
+// All the downstreams in this file
+func (f *File) Downstreams() []*File {
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+
+	downstreams := make([]*File, 0, len(f.downstreams))
+	for downstream := range f.downstreams {
+		downstreams = append(downstreams, downstream)
+	}
+
+	return downstreams
 }
 
 func (f *File) MaskAsDynamicSQL() {

@@ -35,7 +35,9 @@ var runCmd = &cobra.Command{
 		// If we've been given a model to run, run it
 		graph := buildGraph(fileSystem, ModelFilter)
 
-		executeGraph(graph, globalContext)
+		if err := executeGraph(graph, globalContext); err != nil {
+			os.Exit(1)
+		}
 	},
 }
 
@@ -63,15 +65,17 @@ func parseFiles(fileSystem *fs.FileSystem) {
 	pb := utils.NewProgressBar("📜 Reading & Parsing Files", fileSystem.NumberFiles())
 	defer pb.Stop()
 
-	fs.ProcessFiles(
+	_ = fs.ProcessFiles(
 		fileSystem.AllFiles(),
-		func(file *fs.File) {
+		func(file *fs.File) error {
 			if err := compiler.ParseFile(file); err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to parse %s %s: %s\n", file.Type, file.Name, err)
 				os.Exit(1)
 			}
 			pb.Increment()
+
+			return nil
 		},
 		nil,
 	)
@@ -81,9 +85,9 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("📚 Compiling Macros", len(fileSystem.Macros()))
 	defer pb.Stop()
 
-	fs.ProcessFiles(
+	_ = fs.ProcessFiles(
 		fileSystem.Macros(),
-		func(file *fs.File) {
+		func(file *fs.File) error {
 			err := compiler.CompileModel(file, gc, false)
 			if err != nil {
 				pb.Stop()
@@ -91,6 +95,8 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 				os.Exit(1)
 			}
 			pb.Increment()
+
+			return nil
 		},
 		nil,
 	)
@@ -100,9 +106,9 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("📝 Compiling Models", len(fileSystem.Models()))
 	defer pb.Stop()
 
-	fs.ProcessFiles(
+	_ = fs.ProcessFiles(
 		fileSystem.Models(),
-		func(file *fs.File) {
+		func(file *fs.File) error {
 			err := compiler.CompileModel(file, gc, false)
 			if err != nil {
 				pb.Stop()
@@ -111,6 +117,8 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 			}
 
 			pb.Increment()
+
+			return nil
 		},
 		nil,
 	)
@@ -120,9 +128,9 @@ func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("🧪 Compiling Tests", len(fileSystem.Tests()))
 	defer pb.Stop()
 
-	fs.ProcessFiles(
+	_ = fs.ProcessFiles(
 		fileSystem.Tests(),
-		func(file *fs.File) {
+		func(file *fs.File) error {
 			err := compiler.CompileModel(file, gc, false)
 			if err != nil {
 				pb.Stop()
@@ -131,6 +139,8 @@ func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 			}
 
 			pb.Increment()
+
+			return nil
 		},
 		nil,
 	)
@@ -204,20 +214,20 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
 	return graph
 }
 
-func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) {
+func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) error {
 	pb := utils.NewProgressBar("🚀 Executing DAG", graph.Len())
 	defer pb.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	graph.Execute(func(file *fs.File) {
+	return graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile && file.GetMaterialization() != "ephemeral" {
 			if file.IsDynamicSQL() || upstreamProfile != "" {
 				if err := compiler.CompileModel(file, globalContext, true); err != nil {
 					pb.Stop()
 					fmt.Printf("❌ %s\n", err)
 					cancel()
-					os.Exit(1)
+					return err
 				}
 			}
 
@@ -235,10 +245,12 @@ func executeGraph(graph *fs.Graph, globalContext *compiler.GlobalContext) {
 				}
 
 				cancel()
-				os.Exit(1)
+				return err
 			}
 		}
 
 		pb.Increment()
+
+		return nil
 	}, config.NumberThreads(), pb)
 }

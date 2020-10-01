@@ -12,6 +12,8 @@ projects (3000+ data models). This project attempts to be a direct drop in repla
 - `ddbt show my_model` will output the compiled SQL to the terminal
 - `ddbt copy my_model` will copy the compiled SQL into your clipboard
 - `ddbt show-dag` will output the order of how the models will execute
+- `ddbt watch` will get act like `run`, followed by `test`. DDBT will then watch your file system for any changes and automatically rerun those parts of the DAG and affected downstream tests or failing tests.
+- `ddbt watch --skip-run` is the same as watch, but will skip the initial run (preventing you having to wait for all the models to run) before running the tests and starting to watch your file system.
 
 ### Global Arguments
 - `--models model_filter` _or_ `-m model_filter`: Instead of running for every model in your project, DDBT will only execute against the requested models. See filters below for what is accepted for `my_model`

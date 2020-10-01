@@ -5,8 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
+
+	"ddbt/utils"
 )
 
 type Watcher struct {
@@ -18,7 +21,8 @@ type Watcher struct {
 
 	EventsReady chan struct{}
 
-	events *Events
+	events         *Events
+	notifyListener utils.DebouncedFunction
 }
 
 func NewWatcher() (*Watcher, error) {
@@ -34,6 +38,11 @@ func NewWatcher() (*Watcher, error) {
 		events:      nil,
 		EventsReady: make(chan struct{}),
 	}
+
+	// We debounce this to give the system time to process mass file updates
+	w.notifyListener = utils.Debounce(func() {
+		w.EventsReady <- struct{}{}
+	}, 50*time.Millisecond)
 
 	go w.listenForChangeEvents()
 
@@ -130,7 +139,7 @@ func (w *Watcher) recordEventInBatch(path string, event EventType, info os.FileI
 
 	if w.events == nil {
 		w.events = newEventBatch()
-		w.EventsReady <- struct{}{}
+		w.notifyListener()
 	}
 
 	w.events.addEvent(path, event, info)

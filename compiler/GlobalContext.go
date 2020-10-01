@@ -202,3 +202,22 @@ func (g *GlobalContext) GetTarget() (*config.Target, error) {
 func (g *GlobalContext) MarkAsDynamicSQL() (*compilerInterface.Value, error) {
 	panic("Mark as dynamic SQL not support on the global context")
 }
+
+func (g *GlobalContext) UnregisterMacrosInFile(file *fs.File) {
+	g.macroMutex.Lock()
+	defer g.macroMutex.Unlock()
+
+	toDelete := make([]string, 0)
+
+	// In case the macro name is different to the file name
+	// as one file might contain multiple macro's
+	for key, macroDef := range g.macros {
+		if macroDef.fileName == file.Name {
+			toDelete = append(toDelete, key)
+		}
+	}
+
+	for _, key := range toDelete {
+		delete(g.macros, key)
+	}
+}

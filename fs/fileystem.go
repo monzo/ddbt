@@ -10,15 +10,15 @@ import (
 )
 
 type FileSystem struct {
-	files       []*File
-	macroLookup map[string]*File
-	modelLookup map[string]*File
-	tests       []*File
+	files       map[string]*File // path -> File
+	macroLookup map[string]*File // macro name -> File
+	modelLookup map[string]*File // model lookup name -> File
+	tests       []*File          // Tests
 }
 
 func ReadFileSystem() (*FileSystem, error) {
 	fs := &FileSystem{
-		files:       make([]*File, 0),
+		files:       make(map[string]*File),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
 		tests:       make([]*File, 0),
@@ -49,17 +49,18 @@ func ReadFileSystem() (*FileSystem, error) {
 // Create a test file system with mock files
 func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 	fs := &FileSystem{
-		files:       make([]*File, 0),
+		files:       make(map[string]*File, 0),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
 	}
 
 	for filePath, contents := range models {
+		filePath = filepath.Clean(filePath)
 
 		file := newFile(filePath, nil, ModelFile)
 		file.PrereadFileContents = contents
 
-		fs.files = append(fs.files, file)
+		fs.files[filePath] = file
 
 		if err := fs.mapModelLookupOptions(file); err != nil {
 			return nil, err
@@ -103,34 +104,40 @@ func (fs *FileSystem) scanDirectory(path string, fileType FileType) error {
 			return nil
 		}
 
+		path = filepath.Clean(path)
+
 		// We don't care about files which are not SQL
 		if filepath.Ext(path) != ".sql" {
 			return nil
 		}
 
-		file := newFile(path, info, fileType)
-		fs.files = append(fs.files, file)
+		return fs.recordFile(path, info, fileType)
+	})
+}
 
-		// For models we want to be able to look them up by partial file name
-		switch fileType {
-		case MacroFile:
-			if err := fs.mapMacroLookupOptions(file); err != nil {
-				return err
-			}
+func (fs *FileSystem) recordFile(path string, info os.FileInfo, fileType FileType) error {
+	file := newFile(path, info, fileType)
+	fs.files[path] = file
 
-		case ModelFile:
-			if err := fs.mapModelLookupOptions(file); err != nil {
-				return err
-			}
-
-		case TestFile:
-			if err := fs.mapTestLookupOptions(file); err != nil {
-				return err
-			}
+	// For models we want to be able to look them up by partial file name
+	switch fileType {
+	case MacroFile:
+		if err := fs.mapMacroLookupOptions(file); err != nil {
+			return err
 		}
 
-		return nil
-	})
+	case ModelFile:
+		if err := fs.mapModelLookupOptions(file); err != nil {
+			return err
+		}
+
+	case TestFile:
+		if err := fs.mapTestLookupOptions(file); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Maps macros into our lookup options
@@ -227,5 +234,38 @@ func (fs *FileSystem) Tests() []*File {
 }
 
 func (fs *FileSystem) AllFiles() []*File {
-	return fs.files
+	files := make([]*File, 0, len(fs.files))
+
+	for _, file := range fs.files {
+		files = append(files, file)
+	}
+
+	return files
+}
+
+func (fs *FileSystem) File(path string, info os.FileInfo) (*File, error) {
+	file, found := fs.files[path]
+
+	if !found {
+		if filepath.Ext(path) != ".sql" {
+			return nil, nil
+		}
+
+		fileType := UnknownFile
+		if strings.HasPrefix(path, "macros") {
+			fileType = MacroFile
+		} else if strings.HasPrefix(path, "models") {
+			fileType = ModelFile
+		} else if strings.HasPrefix(path, "tests") {
+			fileType = TestFile
+		}
+
+		if err := fs.recordFile(path, info, fileType); err != nil {
+			return nil, err
+		}
+
+		return fs.files[path], nil
+	}
+
+	return file, nil
 }

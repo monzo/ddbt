@@ -36,8 +36,8 @@ func printGraph(graph *fs.Graph) {
 
 	builder.WriteRune('\n')
 
-	graph.Execute(
-		func(file *fs.File) {
+	_ = graph.Execute(
+		func(file *fs.File) error {
 			if file.Type == fs.ModelFile {
 				builder.WriteString("- ")
 				builder.WriteString(file.Name)
@@ -45,6 +45,8 @@ func printGraph(graph *fs.Graph) {
 			}
 
 			pb.Increment()
+
+			return nil
 		},
 		1,
 		pb,

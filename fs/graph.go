@@ -10,7 +10,6 @@ import (
 
 type Graph struct {
 	nodes map[*File]*Node
-	wait  sync.WaitGroup
 }
 
 type Node struct {
@@ -234,20 +233,44 @@ func (g *Graph) Len() int {
 	return len(g.nodes)
 }
 
-func (g *Graph) Execute(f func(file *File), numWorkers int, pb *utils.ProgressBar) {
-	c := make(chan *Node, len(g.nodes))
+func (g *Graph) Execute(f func(file *File) error, numWorkers int, pb *utils.ProgressBar) error {
+	var wait sync.WaitGroup
 
-	g.wait.Add(len(g.nodes))
+	countOfUnqueued := g.NumberNodesNeedRerunning()
+	c := make(chan *Node, countOfUnqueued)
+
+	wait.Add(countOfUnqueued)
+	end := make(chan struct{})
+
+	var errMutex sync.RWMutex
+	var firstErr error
 
 	worker := func() {
 		statusRow := pb.NewStatusRow()
 
 		for node := range c {
+			errMutex.RLock()
+			if firstErr != nil {
+				errMutex.RUnlock()
+				return
+			}
+			errMutex.RUnlock()
+
 			statusRow.Update(fmt.Sprintf("Running %s", node.file.Name))
 
-			f(node.file)
+			err := f(node.file)
+			if err != nil {
+				errMutex.Lock()
+				if firstErr == nil {
+					firstErr = err
+					end <- struct{}{}
+				}
+				errMutex.Unlock()
+
+				return
+			}
 			node.markNodeAsRun(c)
-			g.wait.Done()
+			wait.Done()
 
 			statusRow.SetIdle()
 		}
@@ -263,7 +286,19 @@ func (g *Graph) Execute(f func(file *File), numWorkers int, pb *utils.ProgressBa
 		}
 	}
 
-	g.wait.Wait()
+	// Wait on the
+	go func() {
+		wait.Wait()
+		end <- struct{}{}
+	}()
+	<-end
+
+	close(c)
+
+	errMutex.RLock()
+	defer errMutex.RUnlock()
+
+	return firstErr
 }
 
 func (n *Node) upstreamContains(other *Node) bool {
@@ -330,13 +365,42 @@ func (n *Node) markNodeAsRun(c chan *Node) {
 	n.hasRun = true
 	n.mutex.Unlock()
 
-	n.mutex.RLock()
-	defer n.mutex.RUnlock()
-
 	// Now find any downstreams which are ready to run
-	for downstream := range n.downstreamNodes {
-		if downstream.allUpstreamsReady() {
-			downstream.queueForRun(c)
+	if c != nil {
+		n.mutex.RLock()
+		defer n.mutex.RUnlock()
+
+		for downstream := range n.downstreamNodes {
+			if downstream.allUpstreamsReady() {
+				downstream.queueForRun(c)
+			}
 		}
 	}
+}
+
+func (g *Graph) MarkGraphAsFullyRun() {
+	for _, node := range g.nodes {
+		node.queuedToRun = true
+		node.hasRun = true
+	}
+}
+
+// If a file is in the graph, this removes it's queuedToRun and hasRun flags
+func (g *Graph) UnmarkFileAsRun(file *File) {
+	node, found := g.nodes[file]
+	if found {
+		node.queuedToRun = false
+		node.hasRun = false
+	}
+}
+
+func (g *Graph) NumberNodesNeedRerunning() int {
+	count := 0
+	for _, node := range g.nodes {
+		if node.hasRun == false {
+			count++
+		}
+	}
+
+	return count
 }
