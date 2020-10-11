@@ -42,7 +42,7 @@ var runCmd = &cobra.Command{
 }
 
 func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
-	fmt.Printf("ℹ️ Building for %s profile\n", config.GlobalCfg.Target.Name)
+	fmt.Printf("ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
 
 	// Read the models on the file system
 	fileSystem, err := fs.ReadFileSystem()
@@ -147,7 +147,7 @@ func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 }
 
 func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
-	pb := utils.NewProgressBar("🕸 Building DAG", 1)
+	pb := utils.NewProgressBar("🕸  Building DAG", 1)
 	defer pb.Stop()
 
 	graph := fs.NewGraph()
