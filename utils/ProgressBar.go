@@ -208,7 +208,11 @@ func (pb *ProgressBar) String(termWidth int) string {
 	rightEdge := builder.String()
 
 	if rightColumnWidth > len(rightEdge) {
-		rightEdge = strings.Repeat(" ", rightColumnWidth-len(rightEdge)) + rightEdge
+		if pb.label == "🕸  Building DAG" {
+			rightEdge = strings.Repeat(" ", rightColumnWidth-len(rightEdge)-1) + rightEdge
+		} else {
+			rightEdge = strings.Repeat(" ", rightColumnWidth-len(rightEdge)) + rightEdge
+		}
 	}
 	builder.Reset()
 
@@ -216,7 +220,11 @@ func (pb *ProgressBar) String(termWidth int) string {
 	builder.WriteString(pb.label)
 
 	if toFill := labelColumnWidth - builder.Len(); toFill > 0 {
-		builder.WriteString(strings.Repeat(" ", toFill)) // Create a buffer so that all the labels align
+		if pb.label == "🕸  Building DAG" {
+			builder.WriteString(strings.Repeat(" ", toFill+1))
+		} else {
+			builder.WriteString(strings.Repeat(" ", toFill)) // Create a buffer so that all the labels align
+		}
 	}
 
 	builder.WriteString(fmt.Sprintf("%3.0f%%", percentage*100))
