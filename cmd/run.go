@@ -147,7 +147,7 @@ func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 }
 
 func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
-	pb := utils.NewProgressBar("🕸  Building DAG", 1)
+	pb := utils.NewProgressBar("🚧 Building DAG", 1)
 	defer pb.Stop()
 
 	graph := fs.NewGraph()
