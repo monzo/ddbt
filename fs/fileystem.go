@@ -3,6 +3,7 @@ package fs
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ type FileSystem struct {
 	tests       []*File          // Tests
 }
 
-func ReadFileSystem() (*FileSystem, error) {
+func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 	fs := &FileSystem{
 		files:       make(map[string]*File),
 		macroLookup: make(map[string]*File),
@@ -41,7 +42,7 @@ func ReadFileSystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	fmt.Printf("🔎 Found %d models, %d macros, %d tests\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests))
+	fmt.Fprintf(msgWriter, "🔎 Found %d models, %d macros, %d tests\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests))
 
 	return fs, nil
 }

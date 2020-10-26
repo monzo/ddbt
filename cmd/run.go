@@ -45,7 +45,7 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	fmt.Printf("ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
 
 	// Read the models on the file system
-	fileSystem, err := fs.ReadFileSystem()
+	fileSystem, err := fs.ReadFileSystem(os.Stdout)
 	if err != nil {
 		fmt.Printf("❌ Unable to read filesystem: %s\n", err)
 		os.Exit(1)

@@ -17,10 +17,11 @@ func init() {
 var showCmd = &cobra.Command{
 	Use:   "show [model name]",
 	Short: "Shows the SQL that would be executed for the given model",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(getModelSQL(args[0]))
 	},
+	ValidArgsFunction: completeModelFn,
 }
 
 func getModelSQL(modelName string) string {
