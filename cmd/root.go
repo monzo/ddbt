@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 	Version: utils.DdbtVersion,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Do not run init if we're running info commands which aren't actually going to execute operate on a project
-		if cmd != versionCmd && cmd.Name() != "help" {
+		if cmd != versionCmd && cmd != completionCmd && cmd.Name() != "help" {
 			initDDBT()
 		}
 	},
