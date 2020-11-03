@@ -20,8 +20,7 @@ var ModelFilter string
 
 func init() {
 	rootCmd.AddCommand(runCmd)
-
-	runCmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
+	addModelsFlag(runCmd)
 }
 
 var runCmd = &cobra.Command{
@@ -39,6 +38,14 @@ var runCmd = &cobra.Command{
 			os.Exit(1)
 		}
 	},
+}
+
+func addModelsFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
+	err := cmd.RegisterFlagCompletionFunc("models", completeModelFn)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {

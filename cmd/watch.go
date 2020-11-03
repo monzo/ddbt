@@ -21,7 +21,8 @@ var skipInitialBuild = false
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
-	watchCmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to watch")
+	addModelsFlag(watchCmd)
+
 	watchCmd.Flags().BoolVarP(&skipInitialBuild, "skip-run", "s", false, "Skip the initial execution of the DAG and go straight into watch mode")
 }
 
