@@ -6,7 +6,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var file string
+
 func init() {
+	completionCmd.Flags().StringVar(&file, "file", "", "file to which output has to be written")
+	_ = completionCmd.MarkFlagFilename("file")
+
 	rootCmd.AddCommand(completionCmd)
 }
 
@@ -38,14 +43,34 @@ $ ddbt completion zsh > "${fpath[1]}/_ddbt"
 
 # You will need to start a new shell for this setup to take effect.`,
 	DisableFlagsInUseLine: true,
-	ValidArgs:             []string{"bash", "zsh"},
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 	Args:                  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
-			cmd.Root().GenBashCompletion(os.Stdout)
+			if file != "" {
+				cmd.Root().GenBashCompletionFile(file)
+			} else {
+				cmd.Root().GenBashCompletion(os.Stdout)
+			}
 		case "zsh":
-			cmd.Root().GenZshCompletion(os.Stdout)
+			if file != "" {
+				cmd.Root().GenZshCompletionFile(file)
+			} else {
+				cmd.Root().GenZshCompletion(os.Stdout)
+			}
+		case "fish":
+			if file != "" {
+				cmd.Root().GenFishCompletionFile(file, true)
+			} else {
+				cmd.Root().GenFishCompletion(os.Stdout, true)
+			}
+		case "powershell":
+			if file != "" {
+				cmd.Root().GenPowerShellCompletionFile(file)
+			} else {
+				cmd.Root().GenPowerShellCompletion(os.Stdout)
+			}
 		}
 	},
 }
