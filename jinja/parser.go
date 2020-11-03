@@ -870,6 +870,17 @@ func (p *parser) parseCondition() (ast.AST, error) {
 
 	}
 
+	if p.peekIs(lexer.IdentToken) && p.peek().Value == "in" {
+		inToken := p.next() // consume the "in"
+
+		value, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+
+		condition = ast.NewInOperator(inToken, condition, value)
+	}
+
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "and" {
 		_ = p.next() // consume and
 
