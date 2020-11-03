@@ -108,7 +108,7 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 		if err == context.Canceled {
 			return "", err
 		}
-		return query, errors.New(fmt.Sprintf("Model %s's exuection job %s in state %s", f.Name, job.ID(), status.State))
+		return query, errors.New(fmt.Sprintf("Model %s's exuection job %s in state %d", f.Name, job.ID(), status.State))
 	}
 
 	if err := status.Err(); err != nil {
@@ -187,7 +187,7 @@ func NumberRows(query string, target *config.Target) (uint64, error) {
 	}
 
 	if status.State != bigquery.Done {
-		return 0, errors.New(fmt.Sprintf("Exuection job %s in state %s", job.ID(), status.State))
+		return 0, errors.New(fmt.Sprintf("Exuection job %s in state %d", job.ID(), status.State))
 	}
 
 	if err := status.Err(); err != nil {
@@ -235,7 +235,7 @@ func GetRows(query string, target *config.Target) ([][]Value, Schema, error) {
 	}
 
 	if status.State != bigquery.Done {
-		return nil, nil, errors.New(fmt.Sprintf("Model %s's exuection job %s in state %s", query, job.ID(), status.State))
+		return nil, nil, errors.New(fmt.Sprintf("Model %s's exuection job %s in state %d", query, job.ID(), status.State))
 	}
 
 	if err := status.Err(); err != nil {
