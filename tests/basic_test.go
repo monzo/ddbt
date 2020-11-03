@@ -444,3 +444,29 @@ func TestStringParsing(t *testing.T) {
 		`{% set data="Hello \" \\World" %}{{ data }}`,
 	)
 }
+
+func TestInSyntax(t *testing.T) {
+	assertCompileOutput(t,
+		`PassedPassed`,
+		`{% set list=['apple', 'pear', 'banana'] -%}
+			{%- if "pear" in list %}Passed{% else %}Failed{% endif -%}
+			{%- if "" in list %}Failed{% else %}Passed{% endif -%}
+		`,
+	)
+
+	assertCompileOutput(t,
+		`PassedPassed`,
+		`{% set map={ "foo": "value" } -%}
+			{%- if "foo" in map %}Passed{% else %}Failed{% endif -%}
+			{%- if "bar" in map %}Failed{% else %}Passed{% endif -%}
+		`,
+	)
+
+	assertCompileOutput(t,
+		`PassedPassed`,
+		`{% set str="hello world" -%}
+			{%- if "llo wor" in str %}Passed{% else %}Failed{% endif -%}
+			{%- if "bar" in str %}Failed{% else %}Passed{% endif -%}
+		`,
+	)
+}
