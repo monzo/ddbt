@@ -60,6 +60,7 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 
 	// Now parse and compile the whole project
 	parseFiles(fileSystem)
+	parseSchemas(fileSystem)
 	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
 	compileMacros(fileSystem, gc)
 	compileFiles(fileSystem, gc)
@@ -78,6 +79,26 @@ func parseFiles(fileSystem *fs.FileSystem) {
 			if err := compiler.ParseFile(file); err != nil {
 				pb.Stop()
 				fmt.Printf("❌ Unable to parse %s %s: %s\n", file.Type, file.Name, err)
+				os.Exit(1)
+			}
+			pb.Increment()
+
+			return nil
+		},
+		nil,
+	)
+}
+
+func parseSchemas(fileSystem *fs.FileSystem) {
+	pb := utils.NewProgressBar("🗃 Reading & Parsing Schemas", fileSystem.NumberSchemas())
+	defer pb.Stop()
+
+	_ = fs.ProcessSchemas(
+		fileSystem.AllSchemas(),
+		func(schema *fs.SchemaFile) error {
+			if err := schema.Parse(); err != nil {
+				pb.Stop()
+				fmt.Printf("❌ Unable to parse %s: %s\n", schema.Name, err)
 				os.Exit(1)
 			}
 			pb.Increment()

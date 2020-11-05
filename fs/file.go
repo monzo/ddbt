@@ -3,7 +3,6 @@ package fs
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -50,7 +49,7 @@ type File struct {
 	isInDAG       bool
 }
 
-func newFile(path string, file os.FileInfo, fileType FileType) *File {
+func newFile(path string, fileType FileType) *File {
 	return &File{
 		Type:         fileType,
 		Name:         strings.TrimSuffix(filepath.Base(path), ".sql"),
@@ -63,6 +62,10 @@ func newFile(path string, file os.FileInfo, fileType FileType) *File {
 
 		EphemeralCTES: make(map[string]*File),
 	}
+}
+
+func (f *File) GetName() string {
+	return f.Name
 }
 
 func (f *File) SetConfig(name string, value *compilerInterface.Value) {

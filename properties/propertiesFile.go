@@ -13,6 +13,11 @@ type File struct {
 	Snapshots Models `yaml:"snapshots,omitempty"` // List of the snapshot schemas defined in this file (same structure as a model)
 }
 
+// Unmarshals the file
+func (f *File) Unmarshal(bytes []byte) error {
+	return yaml.Unmarshal(bytes, f)
+}
+
 // The docs struct defines if a schema shows up on the docs server
 type Docs struct {
 	Show *bool `yaml:"show,omitempty"` // If not set, we default to true (but need to track it's not set for when we write YAML back out)
