@@ -11,10 +11,11 @@ import (
 )
 
 type FileSystem struct {
-	files       map[string]*File // path -> File
-	macroLookup map[string]*File // macro name -> File
-	modelLookup map[string]*File // model lookup name -> File
-	tests       []*File          // Tests
+	files       map[string]*File       // path -> File
+	macroLookup map[string]*File       // macro name -> File
+	modelLookup map[string]*File       // model lookup name -> File
+	schemas     map[string]*SchemaFile // schema files
+	tests       []*File                // Tests
 }
 
 func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
@@ -22,6 +23,7 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		files:       make(map[string]*File),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
+		schemas:     make(map[string]*SchemaFile),
 		tests:       make([]*File, 0),
 	}
 
@@ -42,7 +44,7 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		return nil, err
 	}
 
-	fmt.Fprintf(msgWriter, "🔎 Found %d models, %d macros, %d tests\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests))
+	_, _ = fmt.Fprintf(msgWriter, "🔎 Found %d models, %d macros, %d tests, %d schema files\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests), len(fs.schemas))
 
 	return fs, nil
 }
@@ -53,12 +55,14 @@ func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 		files:       make(map[string]*File, 0),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
+		schemas:     make(map[string]*SchemaFile),
+		tests:       make([]*File, 0),
 	}
 
 	for filePath, contents := range models {
 		filePath = filepath.Clean(filePath)
 
-		file := newFile(filePath, nil, ModelFile)
+		file := newFile(filePath, ModelFile)
 		file.PrereadFileContents = contents
 
 		fs.files[filePath] = file
@@ -107,17 +111,20 @@ func (fs *FileSystem) scanDirectory(path string, fileType FileType) error {
 
 		path = filepath.Clean(path)
 
-		// We don't care about files which are not SQL
-		if filepath.Ext(path) != ".sql" {
-			return nil
+		switch filepath.Ext(path) {
+		case ".sql":
+			return fs.recordSQLFile(path, fileType)
+
+		case ".yml":
+			return fs.recordSchemaFile(path)
 		}
 
-		return fs.recordFile(path, info, fileType)
+		return nil
 	})
 }
 
-func (fs *FileSystem) recordFile(path string, info os.FileInfo, fileType FileType) error {
-	file := newFile(path, info, fileType)
+func (fs *FileSystem) recordSQLFile(path string, fileType FileType) error {
+	file := newFile(path, fileType)
 	fs.files[path] = file
 
 	// For models we want to be able to look them up by partial file name
@@ -137,6 +144,12 @@ func (fs *FileSystem) recordFile(path string, info os.FileInfo, fileType FileTyp
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (fs *FileSystem) recordSchemaFile(path string) error {
+	fs.schemas[path] = newSchemaFile(path)
 
 	return nil
 }
@@ -189,6 +202,10 @@ func (fs *FileSystem) mapTestLookupOptions(file *File) error {
 
 func (fs *FileSystem) NumberFiles() int {
 	return len(fs.files)
+}
+
+func (fs *FileSystem) NumberSchemas() int {
+	return len(fs.schemas)
 }
 
 // Returns a model by name or nil if the model is not found
@@ -261,7 +278,7 @@ func (fs *FileSystem) File(path string, info os.FileInfo) (*File, error) {
 			fileType = TestFile
 		}
 
-		if err := fs.recordFile(path, info, fileType); err != nil {
+		if err := fs.recordSQLFile(path, fileType); err != nil {
 			return nil, err
 		}
 
@@ -269,4 +286,14 @@ func (fs *FileSystem) File(path string, info os.FileInfo) (*File, error) {
 	}
 
 	return file, nil
+}
+
+func (fs *FileSystem) AllSchemas() []*SchemaFile {
+	schemas := make([]*SchemaFile, 0, len(fs.schemas))
+
+	for _, schema := range fs.schemas {
+		schemas = append(schemas, schema)
+	}
+
+	return schemas
 }

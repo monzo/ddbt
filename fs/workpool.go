@@ -8,13 +8,35 @@ import (
 	"ddbt/utils"
 )
 
-// Process the given file list through `f`. If a progress bar is given, then it will show the stauts line as we go
 func ProcessFiles(files []*File, f func(file *File) error, pb *utils.ProgressBar) error {
+	fList := make([]hasName, len(files))
+	for i, file := range files {
+		fList[i] = file
+	}
+
+	return processFiles(fList, func(file hasName) error { return f(file.(*File)) }, pb)
+}
+
+func ProcessSchemas(files []*SchemaFile, f func(file *SchemaFile) error, pb *utils.ProgressBar) error {
+	fList := make([]hasName, len(files))
+	for i, file := range files {
+		fList[i] = file
+	}
+
+	return processFiles(fList, func(file hasName) error { return f(file.(*SchemaFile)) }, pb)
+}
+
+type hasName interface {
+	GetName() string
+}
+
+// Process the given file list through `f`. If a progress bar is given, then it will show the stauts line as we go
+func processFiles(files []hasName, f func(file hasName) error, pb *utils.ProgressBar) error {
 	var wait sync.WaitGroup
 	var errMutex sync.RWMutex
 	var firstError error
 
-	c := make(chan *File, len(files))
+	c := make(chan hasName, len(files))
 
 	worker := func() {
 		var statusRow *utils.StatusRow
@@ -34,7 +56,7 @@ func ProcessFiles(files []*File, f func(file *File) error, pb *utils.ProgressBar
 			errMutex.RUnlock()
 
 			if statusRow != nil {
-				statusRow.Update(fmt.Sprintf("Running %s", file.Name))
+				statusRow.Update(fmt.Sprintf("Running %s", file.GetName()))
 			}
 
 			err := f(file)
