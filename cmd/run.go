@@ -42,7 +42,7 @@ var runCmd = &cobra.Command{
 
 func addModelsFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
-	err := cmd.RegisterFlagCompletionFunc("models", completeModelFn)
+	err := cmd.RegisterFlagCompletionFunc("models", completeModelFilterFn)
 	if err != nil {
 		panic(err)
 	}
