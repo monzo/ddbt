@@ -25,9 +25,7 @@ func completeModelFn(cmd *cobra.Command, args []string, toComplete string) ([]st
 	return matchModel(toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
-// matchModel returns a list of models with the given prefix.
-// If prefix is empty, it returns all models.
-func matchModel(prefix string) []string {
+func getFileSystem() *fs.FileSystem {
 	readFSOnce.Do(func() {
 		// Read filesystem w/o output as it'll interfere with autocompletion
 		fileSystem, err := fs.ReadFileSystem(ioutil.Discard)
@@ -36,9 +34,16 @@ func matchModel(prefix string) []string {
 		}
 		cachedFS = fileSystem
 	})
-	if cachedFS != nil {
-		matched := make([]string, 0, len(cachedFS.Models()))
-		for _, m := range cachedFS.Models() {
+	return cachedFS
+}
+
+// matchModel returns a list of models with the given prefix.
+// If prefix is empty, it returns all models.
+func matchModel(prefix string) []string {
+	fileSys := getFileSystem()
+	if fileSys != nil {
+		matched := make([]string, 0, len(fileSys.Models()))
+		for _, m := range fileSys.Models() {
 			if strings.HasPrefix(m.Name, prefix) {
 				// Include as suggestion:
 				//   model_name -- full/path/to/model_name.sql
