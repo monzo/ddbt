@@ -10,6 +10,7 @@ import (
 	"ddbt/compilerInterface"
 	"ddbt/config"
 	"ddbt/jinja/ast"
+	"ddbt/properties"
 )
 
 type FileType string
@@ -30,6 +31,7 @@ type File struct {
 	FolderConfig config.ModelConfig
 
 	Mutex            sync.Mutex
+	Schema           *properties.Model // The model schema (if we have one)
 	SyntaxTree       ast.AST
 	isDynamicSQL     bool // does this need recompiling as part of the DAG?
 	CompiledContents string

@@ -59,11 +59,11 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	}
 
 	// Now parse and compile the whole project
-	parseFiles(fileSystem)
 	parseSchemas(fileSystem)
+	parseFiles(fileSystem)
 	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
 	compileMacros(fileSystem, gc)
-	compileFiles(fileSystem, gc)
+	compileModels(fileSystem, gc)
 	compileTests(fileSystem, gc)
 
 	return fileSystem, gc
@@ -90,15 +90,15 @@ func parseFiles(fileSystem *fs.FileSystem) {
 }
 
 func parseSchemas(fileSystem *fs.FileSystem) {
-	pb := utils.NewProgressBar("🗃 Reading & Parsing Schemas", fileSystem.NumberSchemas())
+	pb := utils.NewProgressBar("🗃 Reading Schemas", fileSystem.NumberSchemas())
 	defer pb.Stop()
 
 	_ = fs.ProcessSchemas(
 		fileSystem.AllSchemas(),
 		func(schema *fs.SchemaFile) error {
-			if err := schema.Parse(); err != nil {
+			if err := schema.Parse(fileSystem); err != nil {
 				pb.Stop()
-				fmt.Printf("❌ Unable to parse %s: %s\n", schema.Name, err)
+				fmt.Printf("❌ Unable to parse schema %s: %s\n", schema.Name, err)
 				os.Exit(1)
 			}
 			pb.Increment()
@@ -130,7 +130,7 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	)
 }
 
-func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
+func compileModels(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("📝 Compiling Models", len(fileSystem.Models()))
 	defer pb.Stop()
 
@@ -144,12 +144,71 @@ func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 				os.Exit(1)
 			}
 
+			// Check if we need to add schema based tests
+			if file.Schema != nil {
+				if err := addSchemaBasedTests(fileSystem, file); err != nil {
+					pb.Stop()
+					fmt.Printf("❌ Unable to add schema based tests for %s %s: %s\n", file.Type, file.Name, err)
+					os.Exit(1)
+				}
+			}
+
 			pb.Increment()
 
 			return nil
 		},
 		nil,
 	)
+}
+
+func addSchemaBasedTests(fileSystem *fs.FileSystem, file *fs.File) error {
+	// Table level tests
+	for index, tableTest := range file.Schema.Tests {
+		testCode, err := bigquery.GenerateTestSQL(tableTest)
+		if err != nil {
+			return err
+		}
+
+		testFile, err := fileSystem.AddSchemaTest(
+			fmt.Sprintf("%s_%s_%d", tableTest.Name, file.Name, index),
+			testCode,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		err = compiler.ParseFile(testFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Column level tests
+	for _, column := range file.Schema.Columns {
+		for index, tableTest := range column.Tests {
+			testCode, err := bigquery.GenerateTestSQL(tableTest)
+			if err != nil {
+				return err
+			}
+
+			testFile, err := fileSystem.AddSchemaTest(
+				fmt.Sprintf("%s_%s__%s_%d", tableTest.Name, file.Name, column.Name, index),
+				testCode,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			err = compiler.ParseFile(testFile)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {

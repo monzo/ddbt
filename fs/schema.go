@@ -1,8 +1,9 @@
 package fs
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -30,20 +31,44 @@ func (s *SchemaFile) GetName() string {
 	return s.Name
 }
 
-func (s *SchemaFile) Parse() error {
+func (s *SchemaFile) Parse(fs *FileSystem) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	f, err := os.Open(s.Path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-
-	bytes, err := ioutil.ReadAll(f)
+	// Read and parse the schema file
+	bytes, err := ioutil.ReadFile(s.Path)
 	if err != nil {
 		return err
 	}
 
-	return s.Properties.Unmarshal(bytes)
+	err = s.Properties.Unmarshal(bytes)
+	if err != nil {
+		return err
+	}
+
+	// Now attach it to the various models it references
+	for _, modelSchema := range s.Properties.Models {
+		model := fs.Model(modelSchema.Name)
+		if model == nil {
+			model = fs.Test(modelSchema.Name)
+		}
+
+		if model == nil {
+			return errors.New(fmt.Sprintf("Unable to apply model schema; model %s not found", modelSchema.Name))
+		}
+
+		model.Schema = modelSchema
+	}
+
+	// Add snapshot records
+	for _, modelSchema := range s.Properties.Snapshots {
+		model := fs.Model(modelSchema.Name)
+		if model == nil {
+			return errors.New(fmt.Sprintf("Unable to apply snapshot schema; %s not found", modelSchema.Name))
+		}
+
+		model.Schema = modelSchema
+	}
+
+	return nil
 }

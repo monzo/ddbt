@@ -23,7 +23,7 @@ type Docs struct {
 	Show *bool `yaml:"show,omitempty"` // If not set, we default to true (but need to track it's not set for when we write YAML back out)
 }
 
-type Models []Model
+type Models []*Model
 
 // A model/seed/snapshot schema
 type Model struct {
