@@ -459,6 +459,9 @@ func (p *parser) parseValue() (ast.AST, error) {
 
 func (p *parser) parseStatement() (ast.AST, error) {
 	statement, err := p.parseValue()
+	if err != nil {
+		return nil, err
+	}
 
 	// Check if the variable has a maths operation
 	statement, err = p.parsePossibleMathsOps(statement)
@@ -1010,7 +1013,8 @@ func (p *parser) parseMap() (ast.AST, error) {
 	m := ast.NewMap(openingToken)
 
 	for !p.peekIs(lexer.RightBraceToken) {
-		key, err := p.expectedAndConsumeValue(lexer.StringToken)
+		key, err := p.parseValue()
+		//key, err := p.expectedAndConsumeValue(lexer.StringToken)
 		if err != nil {
 			return nil, err
 		}
@@ -1024,11 +1028,6 @@ func (p *parser) parseMap() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		//value := p.next()
-		//if value.Type != lexer.StringToken && value.Type != lexer.NumberToken && value.Type != lexer.NullToken {
-		//	return nil, p.errorAt(value, "Expected string, number or null")
-		//}
 
 		m.Put(key, value)
 

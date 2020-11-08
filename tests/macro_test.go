@@ -39,3 +39,13 @@ func TestMacroDefaults(t *testing.T) {
 {%- endmacro -%}
 {{ test("pass") }}`)
 }
+
+func TestMapSetWithVariableKey(t *testing.T) {
+	assertCompileOutput(t, "pass",
+		`
+{%- macro test(a) -%}
+	{{ a.c }}
+{%- endmacro -%}
+{%- set b = 'c' -%}
+{{ test( {b:'pass'} ) }}`)
+}
