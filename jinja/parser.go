@@ -803,7 +803,7 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
 		notToken := p.next()
 
-		sub, err := p.parseValue()
+		sub, err := p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -832,9 +832,16 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "is" {
 		isToken := p.next() // consume the "is"
 
-		value := "none"
-		if p.peekIs(lexer.NoneToken) {
-			p.next()
+		isNot := false
+		if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+			_ = p.next() // consume the "not"
+			isNot = true
+		}
+
+		value := ""
+		if !p.peekIs(lexer.IdentToken) {
+			// built in tests also include >=, == and other tokens as their names, so we consume them here
+			value = string(p.next().Type)
 		} else {
 			ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
 			if err != nil {
@@ -844,27 +851,25 @@ func (p *parser) parseCondition() (ast.AST, error) {
 			value = ident.Value
 		}
 
-		if value == "not" {
-			if p.peekIs(lexer.NoneToken) {
-				p.next()
-				value = "not none"
-			} else {
-				ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
-				if err != nil {
-					return nil, err
-				}
+		if _, found := ast.BuiltInTests[value]; !found {
+			return nil, p.errorAt(isToken, fmt.Sprintf("Unknown built in test type `%s`", value))
+		}
 
-				value = "not " + ident.Value
+		var arg ast.AST
+		if p.peekIs(lexer.LeftParenthesesToken) {
+			_ = p.next() // consume the "("
+
+			arg, err = p.parseValue()
+			if err != nil {
+				return nil, err
+			}
+
+			if _, err := p.expectedAndConsumeValue(lexer.RightParenthesesToken); err != nil {
+				return nil, err
 			}
 		}
 
-		switch value {
-		case "none", "defined", "not none", "not defined":
-			condition = ast.NewDefineCheck(isToken, condition, value)
-		default:
-			return nil, p.errorAt(isToken, fmt.Sprintf("Expected `none` or `defined` got `%s`", value))
-		}
-
+		condition = ast.NewBuiltInTest(isToken, isNot, condition, value, arg)
 	}
 
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "in" {
