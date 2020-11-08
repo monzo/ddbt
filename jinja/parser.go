@@ -445,7 +445,7 @@ func (p *parser) parseValue() (ast.AST, error) {
 			return nil, err
 		}
 
-		statement = ast.NewNotOperator(notToken, sub)
+		statement = ast.NewNotOperator(notToken, sub).ApplyOperatorPrecedenceRules()
 
 	} else {
 		statement, err = p.parseVariable(nil)
@@ -803,12 +803,12 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
 		notToken := p.next()
 
-		sub, err := p.parseStatement()
+		sub, err := p.parseCondition()
 		if err != nil {
 			return nil, err
 		}
 
-		condition = ast.NewNotOperator(notToken, sub)
+		condition = ast.NewNotOperator(notToken, sub).ApplyOperatorPrecedenceRules()
 	} else {
 		condition, err = p.parseStatement()
 		if err != nil {
