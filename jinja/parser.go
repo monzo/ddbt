@@ -249,21 +249,15 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 			return nil, err
 		}
 
-		var defaultValue *lexer.Token
+		var defaultValue ast.AST
 
 		// Do we have a default value?
 		if p.peekIs(lexer.EqualsToken) {
-			_ = p.next()            // consume the =
-			defaultValue = p.next() // get the default
+			_ = p.next() // consume the =
 
-			if defaultValue.Type != lexer.StringToken &&
-				defaultValue.Type != lexer.NumberToken &&
-				defaultValue.Type != lexer.TrueToken && defaultValue.Type != lexer.FalseToken &&
-				defaultValue.Type != lexer.NoneToken {
-				return nil, p.errorAt(
-					defaultValue,
-					fmt.Sprintf("Expected string, number, boolean or `None` - got: %s", defaultValue.Type),
-				)
+			defaultValue, err = p.parseValue()
+			if err != nil {
+				return nil, err
 			}
 		}
 

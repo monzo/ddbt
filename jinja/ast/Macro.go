@@ -20,7 +20,7 @@ type Macro struct {
 
 type macroParameter struct {
 	name         string
-	defaultValue *lexer.Token
+	defaultValue AST
 }
 
 var _ AST = &Macro{}
@@ -72,7 +72,7 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 					stillOrdered = false
 
 					if param.defaultValue != nil {
-						value, err := compilerInterface.ValueFromToken(param.defaultValue)
+						value, err := param.defaultValue.Execute(ec)
 						if err != nil {
 							return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to understand default value for %s: %s", param.name, err))
 						}
@@ -126,29 +126,14 @@ func (m *Macro) String() string {
 
 		if param.defaultValue != nil {
 			builder.WriteString(" = ")
-
-			switch param.defaultValue.Type {
-			case lexer.StringToken:
-				builder.WriteRune('\'')
-				builder.WriteString(param.defaultValue.Value)
-				builder.WriteRune('\'')
-
-			case lexer.NumberToken:
-				builder.WriteString(param.defaultValue.Value)
-
-			case lexer.TrueToken:
-				builder.WriteString("TRUE")
-
-			case lexer.FalseToken:
-				builder.WriteString("FALSE")
-			}
+			builder.WriteString(param.defaultValue.String())
 		}
 	}
 
 	return fmt.Sprintf("\n{%% macro %s(%s) %%}%s{%% endmacro %%}", m.name, builder.String(), m.body.String())
 }
 
-func (m *Macro) AddParameter(name string, defaultValue *lexer.Token) error {
+func (m *Macro) AddParameter(name string, defaultValue AST) error {
 	if defaultValue != nil {
 		m.numOptionalParams++
 	} else if m.numOptionalParams > 0 {

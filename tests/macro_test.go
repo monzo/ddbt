@@ -27,3 +27,15 @@ func TestReturnInMacro(t *testing.T) {
 {% call test("pass") %}fail{% endcall -%}
 `)
 }
+
+func TestMacroDefaults(t *testing.T) {
+	assertCompileOutput(t, "pass, 1, 2, 3",
+		`
+{%- macro test(a, b=[1, 2, 3]) -%}
+	{{ a }}
+	{%- for value in b -%}
+		, {{ value }}
+	{%- endfor -%}
+{%- endmacro -%}
+{{ test("pass") }}`)
+}

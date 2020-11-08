@@ -28,9 +28,9 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 	}
 
 	// FIXME: disabled for a bit
-	//if err := fs.scanDBTModuleMacros(); err != nil {
-	//	return nil, err
-	//}
+	if err := fs.scanDBTModuleMacros(); err != nil {
+		return nil, err
+	}
 
 	if err := fs.scanDirectory("./macros/", MacroFile); err != nil {
 		return nil, err
