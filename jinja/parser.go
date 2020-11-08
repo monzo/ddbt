@@ -872,10 +872,28 @@ func (p *parser) parseCondition() (ast.AST, error) {
 		condition = ast.NewBuiltInTest(isToken, isNot, condition, value, arg)
 	}
 
+	// "not in" detection
+	if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+		notToken := p.next()
+
+		inToken := p.peek()
+		err := p.expectedAndConsumeIdentifier("in")
+		if err != nil {
+			return nil, err
+		}
+
+		value, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		condition = ast.NewNotOperator(notToken, ast.NewInOperator(inToken, condition, value))
+	}
+
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "in" {
 		inToken := p.next() // consume the "in"
 
-		value, err := p.parseValue()
+		value, err := p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
