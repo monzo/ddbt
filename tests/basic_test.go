@@ -62,6 +62,16 @@ AFTER: {{ a_test_variable }}`,
 	)
 }
 
+func TestSetBlock(t *testing.T) {
+	assertCompileOutput(
+		t,
+		"BEFORE: \n\nAFTER: 21",
+		`BEFORE: {{ a_test_variable }}
+{% set a_test_variable %}21{% endset %}
+AFTER: {{ a_test_variable }}`,
+	)
+}
+
 func TestExpressionTrimSettings(t *testing.T) {
 	assertCompileOutput(
 		t,

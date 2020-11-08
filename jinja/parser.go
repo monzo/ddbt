@@ -932,22 +932,39 @@ func (p *parser) parseSetCall() (ast.AST, error) {
 		return nil, err
 	}
 
-	_, err = p.expectedAndConsumeValue(lexer.EqualsToken)
-	if err != nil {
-		return nil, err
-	}
+	if p.peekIs(lexer.EqualsToken) {
+		// "{% set x = y %}" style
+		_, err = p.expectedAndConsumeValue(lexer.EqualsToken)
+		if err != nil {
+			return nil, err
+		}
 
-	condition, err := p.parseCondition()
-	if err != nil {
-		return nil, err
-	}
+		condition, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
 
-	err = p.parseExpressionBlockClose()
-	if err != nil {
-		return nil, err
-	}
+		err = p.parseExpressionBlockClose()
+		if err != nil {
+			return nil, err
+		}
 
-	return ast.NewSetCall(ident, condition), nil
+		return ast.NewSetCall(ident, condition), nil
+	} else {
+		// "{% set x %}y{% endset %}" style
+		err = p.parseExpressionBlockClose()
+		if err != nil {
+			return nil, err
+		}
+
+		body := ast.NewBody(ident)
+
+		if err := p.parseBodyUntilAtom("endset", body); err != nil {
+			return nil, err
+		}
+
+		return ast.NewSetCall(ident, body), nil
+	}
 }
 
 func (p *parser) parseList() (ast.AST, error) {
