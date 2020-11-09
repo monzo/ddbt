@@ -243,8 +243,22 @@ func (fs *FileSystem) Macros() []*File {
 	return macros
 }
 
+// Adds a virtual macro file to the file system with the provided contents
+func (fs *FileSystem) AddMacroWithContents(fileName string, contents string) (*File, error) {
+	file := newFile(fmt.Sprintf("§VIRTUAL§/%s.sql", fileName), MacroFile)
+	file.PrereadFileContents = contents
+
+	if err := fs.mapMacroLookupOptions(file); err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
 // Return a speciifc test
 func (fs *FileSystem) Test(name string) *File {
+	fs.testMutex.Lock()
+	defer fs.testMutex.Unlock()
 	return fs.tests[name]
 }
 
@@ -258,7 +272,8 @@ func (fs *FileSystem) Tests() []*File {
 	return tests
 }
 
-func (fs *FileSystem) AddSchemaTest(testName string, context string) (*File, error) {
+// Adds a virtual test file to the file system with the provided contents
+func (fs *FileSystem) AddTestWithContents(testName string, content string) (*File, error) {
 	fs.testMutex.Lock()
 	defer fs.testMutex.Unlock()
 
@@ -269,7 +284,7 @@ func (fs *FileSystem) AddSchemaTest(testName string, context string) (*File, err
 	file := newFile(fmt.Sprintf("§VIRTUAL§/%s.sql", testName), TestFile)
 	fs.tests[testName] = file
 
-	file.PrereadFileContents = context
+	file.PrereadFileContents = content
 
 	return file, nil
 }

@@ -1,6 +1,8 @@
 package properties
 
 import (
+	"fmt"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -18,6 +20,32 @@ func (f *File) Unmarshal(bytes []byte) error {
 	return yaml.Unmarshal(bytes, f)
 }
 
+// Lists all the defined tests in this file
+// returns a map with the test name as the key and test file jinja as the value
+func (f *File) DefinedTests() (map[string]string, error) {
+	tests := make(map[string]string)
+
+	for _, model := range f.Models {
+		if err := model.definedTests(tests); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, model := range f.Seeds {
+		if err := model.definedTests(tests); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, model := range f.Snapshots {
+		if err := model.definedTests(tests); err != nil {
+			return nil, err
+		}
+	}
+
+	return tests, nil
+}
+
 // The docs struct defines if a schema shows up on the docs server
 type Docs struct {
 	Show *bool `yaml:"show,omitempty"` // If not set, we default to true (but need to track it's not set for when we write YAML back out)
@@ -33,6 +61,34 @@ type Model struct {
 	Meta        MetaData `yaml:"meta,omitempty"`
 	Tests       Tests    `yaml:"tests,omitempty"`   // Model level tests
 	Columns     Columns  `yaml:"columns,omitempty"` // Columns
+}
+
+func (m *Model) definedTests(tests map[string]string) error {
+	// Table level tests
+	for index, tableTest := range m.Tests {
+		testName := fmt.Sprintf("%s_%s_%d", tableTest.Name, m.Name, index)
+		jinja, err := tableTest.toTestJinja(m.Name, "")
+		if err != nil {
+			return err
+		}
+
+		tests[testName] = jinja
+	}
+
+	// Column level tests
+	for _, column := range m.Columns {
+		for index, tableTest := range column.Tests {
+			testName := fmt.Sprintf("%s_%s__%s_%d", tableTest.Name, m.Name, column.Name, index)
+			jinja, err := tableTest.toTestJinja(m.Name, column.Name)
+			if err != nil {
+				return err
+			}
+
+			tests[testName] = jinja
+		}
+	}
+
+	return nil
 }
 
 type Columns []Column

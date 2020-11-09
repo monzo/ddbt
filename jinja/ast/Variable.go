@@ -148,6 +148,31 @@ func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext, 
 			return compilerInterface.NewFunction(func(_ compilerInterface.ExecutionContext, _ compilerInterface.AST, _ compilerInterface.Arguments) (*compilerInterface.Value, error) {
 				return value, nil
 			}), nil
+		} else if isForFunctionCall && v.token.Value == "get" {
+			return compilerInterface.NewFunction(func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+				defaultValue := compilerInterface.NewUndefined()
+
+				switch len(args) {
+				case 1:
+				case 2:
+					defaultValue = args[1].Value.Unwrap()
+				default:
+					return nil, ec.ErrorAt(caller, fmt.Sprintf("expected 1 or 2 arguments, got %d", len(args)))
+				}
+
+				key := args[0].Value.Unwrap()
+				keyStr := key.AsStringValue()
+				if keyStr == "" {
+					return nil, ec.ErrorAt(caller, "key in the call to get() cannot be blank")
+				}
+
+				v, found := data[keyStr]
+				if !found {
+					return defaultValue, nil
+				} else {
+					return v, nil
+				}
+			}), nil
 		} else {
 			return &compilerInterface.Value{IsUndefined: true}, nil
 		}

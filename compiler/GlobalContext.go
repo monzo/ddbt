@@ -28,7 +28,11 @@ type macroDef struct {
 
 var _ compilerInterface.ExecutionContext = &GlobalContext{}
 
-func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalContext {
+func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) (*GlobalContext, error) {
+	if err := addBuiltInMacros(fileSystem); err != nil {
+		return nil, err
+	}
+
 	return &GlobalContext{
 		fileSystem: fileSystem,
 		macros:     make(map[string]*macroDef),
@@ -81,7 +85,7 @@ func NewGlobalContext(cfg *config.Config, fileSystem *fs.FileSystem) *GlobalCont
 			// https://docs.getdbt.com/reference/dbt-jinja-functions/target
 			"target": nil, // Set by the compiler when it creates an execution context
 		},
-	}
+	}, nil
 }
 
 func (g *GlobalContext) SetVariable(name string, value *compilerInterface.Value) {

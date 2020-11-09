@@ -182,7 +182,7 @@ func (l *lexer) nextTextModeToken() (*Token, error) {
 			return nil, err
 		}
 
-		for !(l.currentRune == '#' && l.nextRune == '}') {
+		for !(l.currentRune == '#' && l.nextRune == '}') && l.nextRune != 0 {
 			if err := l.readRune(); err != nil {
 				return nil, err
 			}

@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"ddbt/compilerInterface"
@@ -51,6 +52,10 @@ func CompileModel(file *fs.File, gc *GlobalContext, isExecuting bool) error {
 	ec.SetVariable("config", file.ConfigObject())
 	ec.SetVariable("execute", compilerInterface.NewBoolean(isExecuting))
 
+	if file.SyntaxTree == nil {
+		return errors.New(fmt.Sprintf("file %s has not been parsed before we attempt the compile", file.Name))
+	}
+
 	finalAST, err := file.SyntaxTree.Execute(ec)
 	if err != nil {
 		return err
@@ -99,13 +104,22 @@ func CompileStringWithCache(s string) (string, error) {
 		return "", err
 	}
 
-	model := fileSystem.AllFiles()[0]
+	model := fileSystem.Model("____")
 	err = ParseFile(model)
 	if err != nil {
 		return "", err
 	}
 
-	gc := NewGlobalContext(config.GlobalCfg, fileSystem)
+	gc, err := NewGlobalContext(config.GlobalCfg, fileSystem)
+	if err != nil {
+		return "", err
+	}
+
+	for _, file := range fileSystem.Macros() {
+		if err := CompileModel(file, gc, false); err != nil {
+			return "", err
+		}
+	}
 	ec := NewExecutionContext(model, fileSystem, true, gc, gc)
 
 	finalValue, err := model.SyntaxTree.Execute(ec)

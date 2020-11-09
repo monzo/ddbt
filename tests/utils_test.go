@@ -51,7 +51,7 @@ var testVariables = map[string]*compilerInterface.Value{
 
 var debugPrintAST = false
 
-func compileFromRaw(t *testing.T, raw string) string {
+func CompileFromRaw(t *testing.T, raw string) (*fs.FileSystem, *compiler.GlobalContext, string) {
 	fileSystem, err := fs.InMemoryFileSystem(
 		map[string]string{
 			"models/target_model.sql": raw,
@@ -78,7 +78,13 @@ func compileFromRaw(t *testing.T, raw string) string {
 			Threads:   4,
 		},
 	}
-	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
+	gc, err := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
+	require.NoError(t, err, "Unable to create global context")
+
+	macros := fileSystem.Macro("built-in-macros")
+	require.NotNil(t, file, "Built in macros was nil")
+	require.NoError(t, compiler.CompileModel(macros, gc, false), "Unable to compile built in macros")
+
 	ec := compiler.NewExecutionContext(file, fileSystem, true, gc, gc)
 	ec.SetVariable("config", file.ConfigObject())
 	for key, value := range testVariables {
@@ -90,14 +96,16 @@ func compileFromRaw(t *testing.T, raw string) string {
 	require.NotNil(t, finalAST, "Output AST is nil")
 	file.CompiledContents = finalAST.AsStringValue()
 
-	return bigquery.BuildQuery(file)
+	return fileSystem, gc, bigquery.BuildQuery(file)
 }
 
 func assertCompileOutput(t *testing.T, expected, input string) {
+	_, _, contentsOfModel := CompileFromRaw(t, input)
+
 	assert.Equal(
 		t,
 		expected,
-		compileFromRaw(t, input),
+		contentsOfModel,
 		"Unexpected output from %s",
 		input,
 	)

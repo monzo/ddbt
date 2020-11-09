@@ -1,9 +1,11 @@
 package properties
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -141,4 +143,46 @@ func (o *Test) MarshalYAML() (interface{}, error) {
 	return yaml.MapSlice{
 		{Key: o.Name, Value: args},
 	}, nil
+}
+
+// Converts this test to a Jinja comptible format
+func (o *Test) toTestJinja(tableName, columnName string) (string, error) {
+	var builder strings.Builder
+
+	builder.WriteString("{{ test_")
+	builder.WriteString(o.Name)
+
+	builder.WriteString("( model=ref('")
+	builder.WriteString(tableName)
+	builder.WriteString("')")
+
+	if columnName != "" {
+		builder.WriteString(", column_name='")
+		builder.WriteString(columnName)
+		builder.WriteString("'")
+	}
+
+	for _, arg := range o.Arguments {
+		jsonValue, err := json.Marshal(arg.Value)
+		if err != nil {
+			return "", errors.New(
+				fmt.Sprintf(
+					"Unable to convert parameter for test %s on column %s of table %s: %s",
+					o.Name,
+					columnName,
+					tableName,
+					err.Error(),
+				),
+			)
+		}
+
+		builder.WriteString(", ")
+		builder.WriteString(arg.Name)
+		builder.WriteRune('=')
+		builder.Write(jsonValue)
+	}
+
+	builder.WriteString(") }}")
+
+	return builder.String(), nil
 }
