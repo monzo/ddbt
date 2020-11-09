@@ -163,7 +163,7 @@ func (v *Variable) resolveFunctionCall(ec compilerInterface.ExecutionContext) (*
 	}
 
 	if value.Type() != compilerInterface.FunctionalVal && value.Function == nil {
-		return nil, ec.ErrorAt(v.subVariable, fmt.Sprintf("required function to execute, got %s", value.Type()))
+		return nil, ec.ErrorAt(v.subVariable, fmt.Sprintf("expected `%s` to be a callable function, got %s", v.subVariable.String(), value.Type()))
 	}
 
 	arguments, err := v.argCall.Execute(ec)

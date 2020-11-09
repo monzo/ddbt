@@ -27,3 +27,25 @@ func TestReturnInMacro(t *testing.T) {
 {% call test("pass") %}fail{% endcall -%}
 `)
 }
+
+func TestMacroDefaults(t *testing.T) {
+	assertCompileOutput(t, "pass, 1, 2, 3",
+		`
+{%- macro test(a, b=[1, 2, 3]) -%}
+	{{ a }}
+	{%- for value in b -%}
+		, {{ value }}
+	{%- endfor -%}
+{%- endmacro -%}
+{{ test("pass") }}`)
+}
+
+func TestMapSetWithVariableKey(t *testing.T) {
+	assertCompileOutput(t, "pass",
+		`
+{%- macro test(a) -%}
+	{{ a.c }}
+{%- endmacro -%}
+{%- set b = 'c' -%}
+{{ test( {b:'pass'} ) }}`)
+}

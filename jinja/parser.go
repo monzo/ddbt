@@ -249,21 +249,15 @@ func (p *parser) parseMacroDefinition() (ast.AST, error) {
 			return nil, err
 		}
 
-		var defaultValue *lexer.Token
+		var defaultValue ast.AST
 
 		// Do we have a default value?
 		if p.peekIs(lexer.EqualsToken) {
-			_ = p.next()            // consume the =
-			defaultValue = p.next() // get the default
+			_ = p.next() // consume the =
 
-			if defaultValue.Type != lexer.StringToken &&
-				defaultValue.Type != lexer.NumberToken &&
-				defaultValue.Type != lexer.TrueToken && defaultValue.Type != lexer.FalseToken &&
-				defaultValue.Type != lexer.NoneToken {
-				return nil, p.errorAt(
-					defaultValue,
-					fmt.Sprintf("Expected string, number, boolean or `None` - got: %s", defaultValue.Type),
-				)
+			defaultValue, err = p.parseValue()
+			if err != nil {
+				return nil, err
 			}
 		}
 
@@ -451,7 +445,7 @@ func (p *parser) parseValue() (ast.AST, error) {
 			return nil, err
 		}
 
-		statement = ast.NewNotOperator(notToken, sub)
+		statement = ast.NewNotOperator(notToken, sub).ApplyOperatorPrecedenceRules()
 
 	} else {
 		statement, err = p.parseVariable(nil)
@@ -465,6 +459,9 @@ func (p *parser) parseValue() (ast.AST, error) {
 
 func (p *parser) parseStatement() (ast.AST, error) {
 	statement, err := p.parseValue()
+	if err != nil {
+		return nil, err
+	}
 
 	// Check if the variable has a maths operation
 	statement, err = p.parsePossibleMathsOps(statement)
@@ -806,12 +803,12 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	} else if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
 		notToken := p.next()
 
-		sub, err := p.parseValue()
+		sub, err := p.parseCondition()
 		if err != nil {
 			return nil, err
 		}
 
-		condition = ast.NewNotOperator(notToken, sub)
+		condition = ast.NewNotOperator(notToken, sub).ApplyOperatorPrecedenceRules()
 	} else {
 		condition, err = p.parseStatement()
 		if err != nil {
@@ -835,9 +832,16 @@ func (p *parser) parseCondition() (ast.AST, error) {
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "is" {
 		isToken := p.next() // consume the "is"
 
-		value := "none"
-		if p.peekIs(lexer.NoneToken) {
-			p.next()
+		isNot := false
+		if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+			_ = p.next() // consume the "not"
+			isNot = true
+		}
+
+		value := ""
+		if !p.peekIs(lexer.IdentToken) {
+			// built in tests also include >=, == and other tokens as their names, so we consume them here
+			value = string(p.next().Type)
 		} else {
 			ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
 			if err != nil {
@@ -847,33 +851,49 @@ func (p *parser) parseCondition() (ast.AST, error) {
 			value = ident.Value
 		}
 
-		if value == "not" {
-			if p.peekIs(lexer.NoneToken) {
-				p.next()
-				value = "not none"
-			} else {
-				ident, err := p.expectedAndConsumeValue(lexer.IdentToken)
-				if err != nil {
-					return nil, err
-				}
+		if _, found := ast.BuiltInTests[value]; !found {
+			return nil, p.errorAt(isToken, fmt.Sprintf("Unknown built in test type `%s`", value))
+		}
 
-				value = "not " + ident.Value
+		var arg ast.AST
+		if p.peekIs(lexer.LeftParenthesesToken) {
+			_ = p.next() // consume the "("
+
+			arg, err = p.parseValue()
+			if err != nil {
+				return nil, err
+			}
+
+			if _, err := p.expectedAndConsumeValue(lexer.RightParenthesesToken); err != nil {
+				return nil, err
 			}
 		}
 
-		switch value {
-		case "none", "defined", "not none", "not defined":
-			condition = ast.NewDefineCheck(isToken, condition, value)
-		default:
-			return nil, p.errorAt(isToken, fmt.Sprintf("Expected `none` or `defined` got `%s`", value))
+		condition = ast.NewBuiltInTest(isToken, isNot, condition, value, arg)
+	}
+
+	// "not in" detection
+	if p.peekIs(lexer.IdentToken) && p.peek().Value == "not" {
+		notToken := p.next()
+
+		inToken := p.peek()
+		err := p.expectedAndConsumeIdentifier("in")
+		if err != nil {
+			return nil, err
 		}
 
+		value, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		condition = ast.NewNotOperator(notToken, ast.NewInOperator(inToken, condition, value))
 	}
 
 	if p.peekIs(lexer.IdentToken) && p.peek().Value == "in" {
 		inToken := p.next() // consume the "in"
 
-		value, err := p.parseValue()
+		value, err := p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -912,22 +932,39 @@ func (p *parser) parseSetCall() (ast.AST, error) {
 		return nil, err
 	}
 
-	_, err = p.expectedAndConsumeValue(lexer.EqualsToken)
-	if err != nil {
-		return nil, err
-	}
+	if p.peekIs(lexer.EqualsToken) {
+		// "{% set x = y %}" style
+		_, err = p.expectedAndConsumeValue(lexer.EqualsToken)
+		if err != nil {
+			return nil, err
+		}
 
-	condition, err := p.parseCondition()
-	if err != nil {
-		return nil, err
-	}
+		condition, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
 
-	err = p.parseExpressionBlockClose()
-	if err != nil {
-		return nil, err
-	}
+		err = p.parseExpressionBlockClose()
+		if err != nil {
+			return nil, err
+		}
 
-	return ast.NewSetCall(ident, condition), nil
+		return ast.NewSetCall(ident, condition), nil
+	} else {
+		// "{% set x %}y{% endset %}" style
+		err = p.parseExpressionBlockClose()
+		if err != nil {
+			return nil, err
+		}
+
+		body := ast.NewBody(ident)
+
+		if err := p.parseBodyUntilAtom("endset", body); err != nil {
+			return nil, err
+		}
+
+		return ast.NewSetCall(ident, body), nil
+	}
 }
 
 func (p *parser) parseList() (ast.AST, error) {
@@ -1016,7 +1053,8 @@ func (p *parser) parseMap() (ast.AST, error) {
 	m := ast.NewMap(openingToken)
 
 	for !p.peekIs(lexer.RightBraceToken) {
-		key, err := p.expectedAndConsumeValue(lexer.StringToken)
+		key, err := p.parseValue()
+		//key, err := p.expectedAndConsumeValue(lexer.StringToken)
 		if err != nil {
 			return nil, err
 		}
@@ -1030,11 +1068,6 @@ func (p *parser) parseMap() (ast.AST, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		//value := p.next()
-		//if value.Type != lexer.StringToken && value.Type != lexer.NumberToken && value.Type != lexer.NullToken {
-		//	return nil, p.errorAt(value, "Expected string, number or null")
-		//}
 
 		m.Put(key, value)
 

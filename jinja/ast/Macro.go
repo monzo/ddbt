@@ -20,7 +20,7 @@ type Macro struct {
 
 type macroParameter struct {
 	name         string
-	defaultValue *lexer.Token
+	defaultValue AST
 }
 
 var _ AST = &Macro{}
@@ -43,29 +43,36 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 		m.name,
 		macroEC,
 		func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-			ec.SetVariable("varargs", args.ToVarArgs())
+			unusedArguments := make(compilerInterface.Arguments, 0) // Unused positional based arguments
+			kwargs := make(map[string]*compilerInterface.Value)     // Unused name based arguments
 
-			// quick lookup map
-			namedArgs := make(map[string]*compilerInterface.Value)
+			// Init both varargs and kwargs to all arguments passed in
 			for _, arg := range args {
 				if arg.Name != "" {
-					namedArgs[arg.Name] = arg.Value
+					kwargs[arg.Name] = arg.Value
 				}
+
+				unusedArguments = append(unusedArguments, arg)
 			}
 
 			stillOrdered := true
 
 			// Process all the parameters, checking what args where provided
 			for i, param := range m.parameters {
-				if value, found := namedArgs[param.name]; found {
+				if value, found := kwargs[param.name]; found {
+					delete(kwargs, param.name) // Consume the used keyword arg
 					ec.SetVariable(param.name, value)
 
 					stillOrdered = len(args) > i && args[i].Name == param.name
+
+					if stillOrdered {
+						unusedArguments = unusedArguments[1:] // this positional argument has been used
+					}
 				} else if len(args) <= i || args[i].Name != "" {
 					stillOrdered = false
 
 					if param.defaultValue != nil {
-						value, err := compilerInterface.ValueFromToken(param.defaultValue)
+						value, err := param.defaultValue.Execute(ec)
 						if err != nil {
 							return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to understand default value for %s: %s", param.name, err))
 						}
@@ -77,8 +84,20 @@ func (m *Macro) Execute(macroEC compilerInterface.ExecutionContext) (*compilerIn
 					return nil, ec.ErrorAt(caller, fmt.Sprintf("Named arguments have been used out of order, please either used all named arguments or keep them in order. Unable to identify what %s should be.", param.name))
 				} else {
 					ec.SetVariable(param.name, args[i].Value)
+					unusedArguments = unusedArguments[1:] // this positional argument has been used
 				}
 			}
+
+			// Now take all the remaining unnamed arguments, and place them in the varargs
+			varArgs := make(compilerInterface.Arguments, 0)
+			for _, arg := range unusedArguments {
+				if arg.Name == "" {
+					varArgs = append(varArgs, arg)
+				}
+			}
+
+			ec.SetVariable("varargs", varArgs.ToVarArgs())
+			ec.SetVariable("kwargs", compilerInterface.NewMap(kwargs))
 
 			result, err := m.body.Execute(ec)
 			if err != nil {
@@ -107,29 +126,14 @@ func (m *Macro) String() string {
 
 		if param.defaultValue != nil {
 			builder.WriteString(" = ")
-
-			switch param.defaultValue.Type {
-			case lexer.StringToken:
-				builder.WriteRune('\'')
-				builder.WriteString(param.defaultValue.Value)
-				builder.WriteRune('\'')
-
-			case lexer.NumberToken:
-				builder.WriteString(param.defaultValue.Value)
-
-			case lexer.TrueToken:
-				builder.WriteString("TRUE")
-
-			case lexer.FalseToken:
-				builder.WriteString("FALSE")
-			}
+			builder.WriteString(param.defaultValue.String())
 		}
 	}
 
 	return fmt.Sprintf("\n{%% macro %s(%s) %%}%s{%% endmacro %%}", m.name, builder.String(), m.body.String())
 }
 
-func (m *Macro) AddParameter(name string, defaultValue *lexer.Token) error {
+func (m *Macro) AddParameter(name string, defaultValue AST) error {
 	if defaultValue != nil {
 		m.numOptionalParams++
 	} else if m.numOptionalParams > 0 {

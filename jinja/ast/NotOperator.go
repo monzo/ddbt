@@ -8,7 +8,7 @@ import (
 )
 
 type NotOperator struct {
-	position     lexer.Position
+	token        *lexer.Token
 	subCondition AST
 }
 
@@ -16,13 +16,13 @@ var _ AST = &NotOperator{}
 
 func NewNotOperator(token *lexer.Token, subCondition AST) *NotOperator {
 	return &NotOperator{
-		position:     token.Start,
+		token:        token,
 		subCondition: subCondition,
 	}
 }
 
 func (n *NotOperator) Position() lexer.Position {
-	return n.position
+	return n.token.Start
 }
 
 func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (*compilerInterface.Value, error) {
@@ -36,4 +36,20 @@ func (n *NotOperator) Execute(ec compilerInterface.ExecutionContext) (*compilerI
 
 func (n *NotOperator) String() string {
 	return fmt.Sprintf("not %s", n.subCondition.String())
+}
+
+func (n *NotOperator) ApplyOperatorPrecedenceRules() AST {
+	if and, ok := n.subCondition.(*AndCondition); ok {
+		and.a = NewNotOperator(n.token, and.a).ApplyOperatorPrecedenceRules()
+
+		return and
+	}
+
+	if or, ok := n.subCondition.(*OrCondition); ok {
+		or.a = NewNotOperator(n.token, or.a).ApplyOperatorPrecedenceRules()
+
+		return or
+	}
+
+	return n
 }

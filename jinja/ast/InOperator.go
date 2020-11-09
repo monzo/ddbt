@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"strings"
 
 	"ddbt/compilerInterface"
 	"ddbt/jinja/lexer"
@@ -43,33 +42,12 @@ func (in *InOperator) Execute(ec compilerInterface.ExecutionContext) (*compilerI
 	needle = needle.Unwrap()
 	haystack = haystack.Unwrap()
 
-	switch haystack.Type() {
-	case compilerInterface.StringVal:
-		// substring check
-		needleStr := needle.AsStringValue()
-
-		return compilerInterface.NewBoolean(strings.Contains(haystack.StringValue, needleStr)), nil
-
-	case compilerInterface.ListVal:
-		// value check
-		for _, item := range haystack.ListValue {
-			if item.Equals(needle) {
-				return compilerInterface.NewBoolean(true), nil
-			}
-		}
-
-		return compilerInterface.NewBoolean(false), nil
-
-	case compilerInterface.MapVal:
-		// key check
-		needleStr := needle.AsStringValue()
-
-		_, found := haystack.MapValue[needleStr]
-		return compilerInterface.NewBoolean(found), nil
-
-	default:
-		return nil, ec.ErrorAt(in, fmt.Sprintf("Unable to perform the `in` operation on a %s", haystack.Type()))
+	result, err := BuiltInTests["in"](needle, haystack)
+	if err != nil {
+		return nil, ec.ErrorAt(in.haystack, err.Error())
 	}
+
+	return compilerInterface.NewBoolean(result), nil
 }
 
 func (in *InOperator) String() string {

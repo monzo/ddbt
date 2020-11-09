@@ -67,6 +67,10 @@ func (b *Body) Append(node AST) {
 	b.parts = append(b.parts, node)
 }
 
+func (b *Body) AppendBody(node AST) {
+	b.Append(node)
+}
+
 func writeValue(ec compilerInterface.ExecutionContext, part compilerInterface.AST, builder *strings.Builder, value *compilerInterface.Value, wrapAndEscape bool) error {
 	if value == nil {
 		return ec.NilResultFor(part)
