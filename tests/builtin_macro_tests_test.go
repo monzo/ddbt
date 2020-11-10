@@ -46,7 +46,7 @@ models:
 `,
 		`
 	SELECT
-	column_a AS value
+	column_a AS value,
 	COUNT(column_a) AS count
 	
 	FROM `+testTableRef+`

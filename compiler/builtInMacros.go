@@ -7,7 +7,7 @@ const builtInMacros = `
 {# This test checks that the value in column_name is always unique #}
 {% macro test_unique(model, column_name) %}
 	SELECT
-	{{ column_name }} AS value
+	{{ column_name }} AS value,
 	COUNT({{ column_name }}) AS count
 	
 	FROM {{ model }}
