@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -80,7 +81,27 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext, graph
 					os.Exit(1)
 				}
 
-				rows, err := bigquery.NumberRows(query, target)
+				var rows uint64
+
+				if file.GetConfig("isSchemaTest").BooleanValue {
+					// schema tests: applied in YAML, returns the number of records that do not pass an assertion —
+					// when this number is 0, all records pass, therefore, your test passes
+					var results [][]bigquery.Value
+					results, _, err = bigquery.GetRows(query, target)
+
+					if err == nil {
+						if len(results) != 1 {
+							err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+						} else if len(results[0]) != 1 {
+							err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+						} else {
+							rows, err = bigquery.ValueAsUint64(results[0][0])
+						}
+					}
+				} else {
+					// data tests: specific queries that return 0 records
+					rows, err = bigquery.NumberRows(query, target)
+				}
 
 				m.Lock()
 				testResults[file] = testResult{

@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"ddbt/compilerInterface"
 )
 
 type FileSystem struct {
@@ -15,7 +18,8 @@ type FileSystem struct {
 	macroLookup map[string]*File       // macro name -> File
 	modelLookup map[string]*File       // model lookup name -> File
 	schemas     map[string]*SchemaFile // schema files
-	tests       []*File                // Tests
+	tests       map[string]*File       // Tests
+	testMutex   sync.Mutex
 }
 
 func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
@@ -24,7 +28,7 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
 		schemas:     make(map[string]*SchemaFile),
-		tests:       make([]*File, 0),
+		tests:       make(map[string]*File),
 	}
 
 	// FIXME: disabled for a bit
@@ -52,11 +56,11 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 // Create a test file system with mock files
 func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 	fs := &FileSystem{
-		files:       make(map[string]*File, 0),
+		files:       make(map[string]*File),
 		macroLookup: make(map[string]*File),
 		modelLookup: make(map[string]*File),
 		schemas:     make(map[string]*SchemaFile),
-		tests:       make([]*File, 0),
+		tests:       make(map[string]*File),
 	}
 
 	for filePath, contents := range models {
@@ -196,7 +200,7 @@ func (fs *FileSystem) mapModelLookupOptions(file *File) error {
 
 // Map tests into our lookup options
 func (fs *FileSystem) mapTestLookupOptions(file *File) error {
-	fs.tests = append(fs.tests, file)
+	fs.tests[file.Name] = file
 	return nil
 }
 
@@ -241,14 +245,52 @@ func (fs *FileSystem) Macros() []*File {
 	return macros
 }
 
+// Adds a virtual macro file to the file system with the provided contents
+func (fs *FileSystem) AddMacroWithContents(fileName string, contents string) (*File, error) {
+	file := newFile(fmt.Sprintf("§VIRTUAL§/%s.sql", fileName), MacroFile)
+	file.PrereadFileContents = contents
+
+	if err := fs.mapMacroLookupOptions(file); err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+// Return a speciifc test
+func (fs *FileSystem) Test(name string) *File {
+	fs.testMutex.Lock()
+	defer fs.testMutex.Unlock()
+	return fs.tests[name]
+}
+
 // Returns a list of tests
 func (fs *FileSystem) Tests() []*File {
 	tests := make([]*File, 0, len(fs.tests))
-	for _, macro := range fs.tests {
-		tests = append(tests, macro)
+	for _, test := range fs.tests {
+		tests = append(tests, test)
 	}
 
 	return tests
+}
+
+// Adds a virtual test file to the file system with the provided contents
+func (fs *FileSystem) AddTestWithContents(testName string, content string, isSchemaTest bool) (*File, error) {
+	fs.testMutex.Lock()
+	defer fs.testMutex.Unlock()
+
+	if _, found := fs.tests[testName]; found {
+		return nil, errors.New(fmt.Sprintf("test %s already exists", testName))
+	}
+
+	file := newFile(fmt.Sprintf("§VIRTUAL§/%s.sql", testName), TestFile)
+	fs.tests[testName] = file
+
+	file.PrereadFileContents = content
+
+	file.SetConfig("isSchemaTest", compilerInterface.NewBoolean(isSchemaTest))
+
+	return file, nil
 }
 
 func (fs *FileSystem) AllFiles() []*File {

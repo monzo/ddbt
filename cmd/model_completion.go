@@ -115,7 +115,11 @@ func getAllTags(fileSys *fs.FileSystem) map[string][]string {
 				continue
 			}
 		}
-		gc := compiler.NewGlobalContext(config.GlobalCfg, fileSys)
+		gc, err := compiler.NewGlobalContext(config.GlobalCfg, fileSys)
+		if err != nil {
+			cobra.CompError(fmt.Sprintf("❌ Unable to create a global context: %s\n", err))
+		}
+
 		for _, f := range append(fileSys.Macros(), fileSys.Models()...) {
 			if err := compiler.CompileModel(f, gc, false); err != nil {
 				cobra.CompError(fmt.Sprintf("❌ Unable to compile file %s: %s\n", f.Path, err))

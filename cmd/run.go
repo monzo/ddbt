@@ -18,6 +18,8 @@ import (
 
 var ModelFilter string
 
+const EnableSchemaBasedTests = false
+
 func init() {
 	rootCmd.AddCommand(runCmd)
 	addModelsFlag(runCmd)
@@ -59,11 +61,16 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	}
 
 	// Now parse and compile the whole project
-	parseFiles(fileSystem)
 	parseSchemas(fileSystem)
-	gc := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
+	parseFiles(fileSystem)
+	gc, err := compiler.NewGlobalContext(config.GlobalCfg, fileSystem)
+	if err != nil {
+		fmt.Printf("❌ Unable to create a global context: %s\n", err)
+		os.Exit(1)
+	}
+
 	compileMacros(fileSystem, gc)
-	compileFiles(fileSystem, gc)
+	compileModels(fileSystem, gc)
 	compileTests(fileSystem, gc)
 
 	return fileSystem, gc
@@ -90,17 +97,42 @@ func parseFiles(fileSystem *fs.FileSystem) {
 }
 
 func parseSchemas(fileSystem *fs.FileSystem) {
-	pb := utils.NewProgressBar("🗃 Reading & Parsing Schemas", fileSystem.NumberSchemas())
+	pb := utils.NewProgressBar("🗃 Reading Schemas", fileSystem.NumberSchemas())
 	defer pb.Stop()
 
 	_ = fs.ProcessSchemas(
 		fileSystem.AllSchemas(),
 		func(schema *fs.SchemaFile) error {
-			if err := schema.Parse(); err != nil {
+			if err := schema.Parse(fileSystem); err != nil {
 				pb.Stop()
-				fmt.Printf("❌ Unable to parse %s: %s\n", schema.Name, err)
+				fmt.Printf("❌ Unable to parse schema %s: %s\n", schema.Name, err)
 				os.Exit(1)
 			}
+
+			if EnableSchemaBasedTests {
+				tests, err := schema.Properties.DefinedTests()
+				if err != nil {
+					pb.Stop()
+					fmt.Printf("❌ Unable to generate the tests defined in schema %s: %s\n", schema.Name, err)
+					os.Exit(1)
+				}
+
+				for testName, testCode := range tests {
+					file, err := fileSystem.AddTestWithContents(testName, testCode, true)
+					if err != nil {
+						pb.Stop()
+						fmt.Printf("❌ Unable to add test %s from schema %s: %s\n", testName, schema.Name, err)
+						os.Exit(1)
+					}
+
+					if err := compiler.ParseFile(file); err != nil {
+						pb.Stop()
+						fmt.Printf("❌ Unable to parse test %s from schema %s: %s\n", testName, schema.Name, err)
+						os.Exit(1)
+					}
+				}
+			}
+
 			pb.Increment()
 
 			return nil
@@ -130,7 +162,7 @@ func compileMacros(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	)
 }
 
-func compileFiles(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
+func compileModels(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	pb := utils.NewProgressBar("📝 Compiling Models", len(fileSystem.Models()))
 	defer pb.Stop()
 
