@@ -118,7 +118,7 @@ func parseSchemas(fileSystem *fs.FileSystem) {
 				}
 
 				for testName, testCode := range tests {
-					file, err := fileSystem.AddTestWithContents(testName, testCode)
+					file, err := fileSystem.AddTestWithContents(testName, testCode, true)
 					if err != nil {
 						pb.Stop()
 						fmt.Printf("❌ Unable to add test %s from schema %s: %s\n", testName, schema.Name, err)

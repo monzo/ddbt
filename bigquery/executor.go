@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -136,6 +137,29 @@ func BuildQuery(f *fs.File) string {
 
 type Value = bigquery.Value
 type Schema = bigquery.Schema
+
+func ValueAsUint64(value Value) (uint64, error) {
+	switch v := value.(type) {
+	case int:
+		return uint64(v), nil
+	case uint:
+		return uint64(v), nil
+	case int32:
+		return uint64(v), nil
+	case uint32:
+		return uint64(v), nil
+	case int64:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	case float32:
+		return uint64(v), nil
+	case float64:
+		return uint64(v), nil
+	default:
+		return 0, errors.New(fmt.Sprintf("unable to convert %v into a uint64", reflect.TypeOf(value)))
+	}
+}
 
 func Quote(value string) string {
 	// ' => \'

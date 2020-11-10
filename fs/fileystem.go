@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"ddbt/compilerInterface"
 )
 
 type FileSystem struct {
@@ -273,7 +275,7 @@ func (fs *FileSystem) Tests() []*File {
 }
 
 // Adds a virtual test file to the file system with the provided contents
-func (fs *FileSystem) AddTestWithContents(testName string, content string) (*File, error) {
+func (fs *FileSystem) AddTestWithContents(testName string, content string, isSchemaTest bool) (*File, error) {
 	fs.testMutex.Lock()
 	defer fs.testMutex.Unlock()
 
@@ -285,6 +287,8 @@ func (fs *FileSystem) AddTestWithContents(testName string, content string) (*Fil
 	fs.tests[testName] = file
 
 	file.PrereadFileContents = content
+
+	file.SetConfig("isSchemaTest", compilerInterface.NewBoolean(isSchemaTest))
 
 	return file, nil
 }

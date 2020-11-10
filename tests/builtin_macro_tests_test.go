@@ -24,7 +24,7 @@ func assertTestSchema(t *testing.T, propertiesYaml string, expectedTestSQL strin
 	fileSystem, gc, _ := CompileFromRaw(t, "SELECT 1 as column_a")
 
 	for testName, testContents := range tests {
-		file, err := fileSystem.AddTestWithContents(testName, testContents)
+		file, err := fileSystem.AddTestWithContents(testName, testContents, true)
 		require.NoError(t, err, "Unable to add test file")
 		require.NoError(t, compiler.ParseFile(file), "Unable to parse test file")
 		require.NoError(t, compiler.CompileModel(file, gc, true), "Unable to compile test file")
@@ -45,6 +45,7 @@ models:
       - name: column_b
 `,
 		`
+WITH test_data AS (
 	SELECT
 	column_a AS value,
 	COUNT(column_a) AS count
@@ -54,6 +55,9 @@ models:
 	GROUP BY column_a 
 	
 	HAVING COUNT(column_a) > 1
+)
+
+SELECT COUNT(*) as num_errors FROM test_data
 `,
 	)
 }
@@ -70,12 +74,16 @@ models:
       - name: column_b
 `,
 		`
+WITH test_data AS (
 	SELECT
 	column_a AS value
 	
 	FROM `+testTableRef+`
 	
 	WHERE column_a IS NULL
+)
+
+SELECT COUNT(*) as num_errors FROM test_data
 `,
 	)
 }
@@ -93,6 +101,7 @@ models:
       - name: column_b
 `,
 		`
+WITH test_data AS (
 	SELECT
 	column_a AS value
 	
@@ -101,6 +110,9 @@ models:
 	WHERE column_a NOT IN (
 		'foo', 'bar'
 	)
+)
+
+SELECT COUNT(*) as num_errors FROM test_data
 `,
 	)
 
@@ -117,6 +129,7 @@ models:
       - name: column_b
 `,
 		`
+WITH test_data AS (
 	SELECT
 	column_a AS value
 	
@@ -125,6 +138,9 @@ models:
 	WHERE column_a NOT IN (
 		foo, bar
 	)
+)
+
+SELECT COUNT(*) as num_errors FROM test_data
 `,
 	)
 }
@@ -143,6 +159,7 @@ models:
       - name: column_b
 `,
 		`
+WITH test_data AS (
 	SELECT
 	column_a AS value
 
@@ -152,6 +169,9 @@ models:
 	ON dest.id = src.column_a
 
 	WHERE dest.id IS NULL AND src.column_a IS NOT NULL
+)
+
+SELECT COUNT(*) as num_errors FROM test_data
 `,
 	)
 }
