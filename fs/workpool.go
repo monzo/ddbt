@@ -26,6 +26,14 @@ func ProcessSchemas(files []*SchemaFile, f func(file *SchemaFile) error, pb *uti
 	return processFiles(fList, func(file hasName) error { return f(file.(*SchemaFile)) }, pb)
 }
 
+func ProcessSeeds(seeds []*SeedFile, fn func(s *SeedFile) error, pb *utils.ProgressBar) error {
+	seedList := make([]hasName, 0, len(seeds))
+	for _, seed := range seeds {
+		seedList = append(seedList, seed)
+	}
+	return processFiles(seedList, func(s hasName) error { return fn(s.(*SeedFile)) }, pb)
+}
+
 type hasName interface {
 	GetName() string
 }

@@ -31,6 +31,10 @@ func (c *Config) GetTargetFor(path string) *Target {
 		if strings.HasPrefix(path, fmt.Sprintf("tests%c%s%c", os.PathSeparator, modelGroup, os.PathSeparator)) {
 			return target
 		}
+
+		if strings.HasPrefix(path, fmt.Sprintf("data%c%s%c", os.PathSeparator, modelGroup, os.PathSeparator)) {
+			return target
+		}
 	}
 
 	return c.Target
