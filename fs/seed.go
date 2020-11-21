@@ -27,3 +27,7 @@ func (s SeedFile) GetTarget() (*config.Target, error) {
 	// No target overrides
 	return config.GlobalCfg.GetTargetFor(s.Path), nil
 }
+
+func (s SeedFile) GetConfig() (*config.SeedConfig, error) {
+	return config.GlobalCfg.GetSeedConfig(s.Path), nil
+}
