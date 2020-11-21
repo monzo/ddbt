@@ -326,10 +326,21 @@ func LoadSeedFile(ctx context.Context, seed *fs.SeedFile) error {
 	defer f.Close()
 
 	rs := bigquery.NewReaderSource(f)
-	rs.AllowJaggedRows = true
-	rs.AutoDetect = true // Auto detect schema
+	rs.AllowJaggedRows = false
 	rs.SkipLeadingRows = 1
 	rs.SourceFormat = bigquery.CSV
+
+	if seed.HasSchema() {
+		schema, err := getSeedSchema(seed)
+		if err != nil {
+			return err
+		}
+		rs.Schema = schema
+		rs.AutoDetect = false
+	} else {
+		rs.AutoDetect = true
+	}
+
 	dataset := client.DatasetInProject(target.ProjectID, target.DataSet)
 	loader := dataset.Table(seed.Name).LoaderFrom(rs)
 	loader.WriteDisposition = bigquery.WriteTruncate // Replace table content
@@ -350,4 +361,16 @@ func LoadSeedFile(ctx context.Context, seed *fs.SeedFile) error {
 	}
 
 	return nil
+}
+
+func getSeedSchema(seed *fs.SeedFile) (bigquery.Schema, error) {
+	schema := make([]*bigquery.FieldSchema, 0, len(seed.Columns))
+	// Use schema specified column types if available
+	for column, colType := range seed.ColumnTypes {
+		schema = append(schema, &bigquery.FieldSchema{
+			Name: column,
+			Type: bigquery.FieldType(strings.ToUpper(colType)),
+		})
+	}
+	return schema, nil
 }

@@ -34,11 +34,40 @@ var seedCommand = &cobra.Command{
 
 func loadSeeds(fileSystem *fs.FileSystem) error {
 	seeds := fileSystem.Seeds()
-	pb := utils.NewProgressBar("🌱 Loading Seeds", len(seeds))
-	defer pb.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if err := readSeedColumns(ctx, seeds); err != nil {
+		return err
+	}
+	if err := uploadSeeds(ctx, seeds); err != nil {
+		return err
+	}
+	return nil
+}
+
+func readSeedColumns(ctx context.Context, seeds []*fs.SeedFile) error {
+	pb := utils.NewProgressBar("🚜 Inferring Seed Schema", len(seeds))
+	defer pb.Stop()
+
+	return fs.ProcessSeeds(
+		seeds,
+		func(seed *fs.SeedFile) error {
+			if err := seed.ReadColumns(); err != nil {
+				return err
+			}
+
+			pb.Increment()
+			return nil
+		},
+		nil,
+	)
+}
+
+func uploadSeeds(ctx context.Context, seeds []*fs.SeedFile) error {
+	pb := utils.NewProgressBar("🌱 Uploading Seeds", len(seeds))
+	defer pb.Stop()
 
 	return fs.ProcessSeeds(
 		seeds,
@@ -52,5 +81,4 @@ func loadSeeds(fileSystem *fs.FileSystem) error {
 		},
 		nil,
 	)
-
 }
