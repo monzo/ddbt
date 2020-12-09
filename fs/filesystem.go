@@ -211,6 +211,9 @@ func (fs *FileSystem) recordSeedFile(path string) error {
 	if prev, found := fs.seeds[name]; found {
 		return fmt.Errorf("%s and %s targets the same model: %s", prev.Path, path, name)
 	}
+	if model := fs.Model(name); model != nil {
+		return fmt.Errorf("model %s and seed %s targets the same model: %s", model.Path, path, name)
+	}
 	fs.seeds[name] = newSeedFile(path)
 
 	return nil
