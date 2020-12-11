@@ -8,6 +8,7 @@ import (
 
 // SeedConfig represents the seed configuration specified in dbt_project.yml
 type SeedConfig struct {
+	GeneralConfig
 	QuoteColumns bool              `yaml:"quote_columns"`
 	ColumnTypes  map[string]string `yaml:"column_types"`
 }
@@ -41,17 +42,20 @@ type seedConfigParser struct {
 
 func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]interface{}) error {
 	subFolders := make(map[string]map[string]interface{})
-	var cfg *SeedConfig
+	var cfg SeedConfig
 
-	for key, value := range seedCfg {
+	// Process common general configurations.
+	remaining, err := readGeneralConfig(&cfg.GeneralConfig, seedCfg, simpleStringExecutor)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range remaining {
 		switch key {
 		case "quote_columns":
 			b, err := asBool(key, value)
 			if err != nil {
 				return err
-			}
-			if cfg == nil {
-				cfg = new(SeedConfig)
 			}
 			cfg.QuoteColumns = b
 
@@ -59,9 +63,6 @@ func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]i
 			kvm, err := asKeyValueStringMap(key, value)
 			if err != nil {
 				return err
-			}
-			if cfg == nil {
-				cfg = new(SeedConfig)
 			}
 			cfg.ColumnTypes = kvm
 
@@ -82,20 +83,22 @@ func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]i
 
 			subFolders[key] = kvm
 		}
+	}
 
-		if cfg != nil {
-			// Config found for "data/{pathPrefix}.csv"
-			p.SeedConfigs[pathPrefix] = cfg
-		}
-
-		// Recurse into sub folders
-		for name, value := range subFolders {
-			if err := p.readCfgForDir(fmt.Sprintf("%s%c%s", pathPrefix, os.PathSeparator, name), value); err != nil {
-				return err
-			}
+	// Recurse into sub folders
+	for name, value := range subFolders {
+		if err := p.readCfgForDir(fmt.Sprintf("%s%c%s", pathPrefix, os.PathSeparator, name), value); err != nil {
+			return err
 		}
 	}
+
+	p.SeedConfigs[pathPrefix] = &cfg
+
 	return nil
+}
+
+func simpleStringExecutor(s string) (string, error) {
+	return s, nil
 }
 
 // asKeyValueStringMap converts value to a map[string]string.
