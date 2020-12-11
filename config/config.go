@@ -16,6 +16,9 @@ type Config struct {
 
 	// Custom behaviour which allows us to override the target information on a per folder basis within `/models/`
 	ModelGroups map[string]*Target
+
+	// seedConfig holds the seed (global) configurations
+	seedConfig map[string]*SeedConfig
 }
 
 func (c *Config) GetTargetFor(path string) *Target {
@@ -29,6 +32,10 @@ func (c *Config) GetTargetFor(path string) *Target {
 		}
 
 		if strings.HasPrefix(path, fmt.Sprintf("tests%c%s%c", os.PathSeparator, modelGroup, os.PathSeparator)) {
+			return target
+		}
+
+		if strings.HasPrefix(path, fmt.Sprintf("data%c%s%c", os.PathSeparator, modelGroup, os.PathSeparator)) {
 			return target
 		}
 	}
@@ -122,6 +129,14 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 		return nil, errors.New(fmt.Sprintf("no models config found, expected to find `models: %s:` in `dbt_project.yml`", project.Name))
 	}
 
+	if seedCfg, found := project.Seeds[project.Name]; found {
+		cfg, err := readSeedCfg(seedCfg)
+		if err != nil {
+			return nil, err
+		}
+		GlobalCfg.seedConfig = cfg
+	}
+
 	return GlobalCfg, nil
 }
 
@@ -133,6 +148,7 @@ type dbtProject struct {
 	Name    string                            `yaml:"name"`
 	Profile string                            `yaml:"profile"`
 	Models  map[string]map[string]interface{} `yaml:"models"` // "Models[project_name][key]value"
+	Seeds   map[string]map[string]interface{} `yaml:"seeds"`  // "Seeds[project_name][key]value"
 }
 
 func readDBTProject() (dbtProject, error) {

@@ -19,6 +19,7 @@ type FileSystem struct {
 	modelLookup map[string]*File       // model lookup name -> File
 	schemas     map[string]*SchemaFile // schema files
 	tests       map[string]*File       // Tests
+	seeds       map[string]*SeedFile   // Seed CSV files
 	testMutex   sync.Mutex
 }
 
@@ -29,6 +30,7 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		modelLookup: make(map[string]*File),
 		schemas:     make(map[string]*SchemaFile),
 		tests:       make(map[string]*File),
+		seeds:       make(map[string]*SeedFile),
 	}
 
 	// FIXME: disabled for a bit
@@ -48,7 +50,19 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		return nil, err
 	}
 
-	_, _ = fmt.Fprintf(msgWriter, "🔎 Found %d models, %d macros, %d tests, %d schema files\n", len(fs.files)-len(fs.macroLookup)-len(fs.tests), len(fs.macroLookup), len(fs.tests), len(fs.schemas))
+	if err := fs.scanSeedDirectory("./data/"); err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintf(
+		msgWriter,
+		"🔎 Found %d models, %d macros, %d tests, %d schema, %d seed files\n",
+		len(fs.files)-len(fs.macroLookup)-len(fs.tests),
+		len(fs.macroLookup),
+		len(fs.tests),
+		len(fs.schemas),
+		len(fs.seeds),
+	)
 
 	return fs, nil
 }
@@ -61,6 +75,7 @@ func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 		modelLookup: make(map[string]*File),
 		schemas:     make(map[string]*SchemaFile),
 		tests:       make(map[string]*File),
+		seeds:       make(map[string]*SeedFile),
 	}
 
 	for filePath, contents := range models {
@@ -167,6 +182,39 @@ func (fs *FileSystem) mapMacroLookupOptions(file *File) error {
 		return errors.New("macro " + path + " already in lookup")
 	}
 	fs.macroLookup[path] = file
+
+	return nil
+}
+
+func (fs *FileSystem) scanSeedDirectory(path string) error {
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		// If we've encountered an error walking this path, let's return now
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(filepath.Clean(path)) == ".csv" {
+			return fs.recordSeedFile(path)
+		}
+
+		return nil
+	})
+}
+
+func (fs *FileSystem) recordSeedFile(path string) error {
+	name := strings.TrimSuffix(filepath.Base(path), ".csv")
+
+	if prev, found := fs.seeds[name]; found {
+		return fmt.Errorf("%s and %s targets the same model: %s", prev.Path, path, name)
+	}
+	if model := fs.Model(name); model != nil {
+		return fmt.Errorf("model %s and seed %s targets the same model: %s", model.Path, path, name)
+	}
+	fs.seeds[name] = newSeedFile(path)
 
 	return nil
 }
@@ -338,4 +386,13 @@ func (fs *FileSystem) AllSchemas() []*SchemaFile {
 	}
 
 	return schemas
+}
+
+func (fs *FileSystem) Seeds() []*SeedFile {
+	seeds := make([]*SeedFile, 0, len(fs.seeds))
+
+	for _, seed := range fs.seeds {
+		seeds = append(seeds, seed)
+	}
+	return seeds
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -296,5 +297,80 @@ func GetColumnsFromTable(table string, target *config.Target) (Schema, error) {
 		return nil, err
 	}
 
+	return schema, nil
+}
+
+// LoadSeedFile loads a CSV file to BigQuery as a table.
+func LoadSeedFile(ctx context.Context, seed *fs.SeedFile) error {
+	target, err := seed.GetTarget()
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case target.ProjectID == "":
+		return errors.New("no project ID defined to run query against")
+	case target.DataSet == "":
+		return errors.New("no dataset defined to run query against")
+	}
+
+	client, err := GetClientFor(target.RandExecutionProject())
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(seed.Path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	rs := bigquery.NewReaderSource(f)
+	rs.AllowJaggedRows = false
+	rs.SkipLeadingRows = 1
+	rs.SourceFormat = bigquery.CSV
+
+	if seed.HasSchema() {
+		schema, err := getSeedSchema(seed)
+		if err != nil {
+			return err
+		}
+		rs.Schema = schema
+		rs.AutoDetect = false
+	} else {
+		rs.AutoDetect = true
+	}
+
+	dataset := client.DatasetInProject(target.ProjectID, target.DataSet)
+	loader := dataset.Table(seed.Name).LoaderFrom(rs)
+	loader.WriteDisposition = bigquery.WriteTruncate // Replace table content
+
+	job, err := loader.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("Unable to start load job for file: %s: %w", seed.Path, err)
+	}
+	status, err := job.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("Error loading seed file %s: %w", seed.Path, err)
+	}
+	if status.State != bigquery.Done {
+		return fmt.Errorf("Seed file %s's loading job %s in state %d", seed.Path, job.ID(), status.State)
+	}
+	if err := status.Err(); err != nil {
+		return fmt.Errorf("Seed file %s's loading job has an error: %w", seed.Path, err)
+	}
+
+	return nil
+}
+
+func getSeedSchema(seed *fs.SeedFile) (bigquery.Schema, error) {
+	schema := make([]*bigquery.FieldSchema, 0, len(seed.Columns))
+	// Use schema specified column types if available
+	for column, colType := range seed.ColumnTypes {
+		schema = append(schema, &bigquery.FieldSchema{
+			Name: column,
+			Type: bigquery.FieldType(strings.ToUpper(colType)),
+		})
+	}
 	return schema, nil
 }
