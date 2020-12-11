@@ -366,10 +366,10 @@ func LoadSeedFile(ctx context.Context, seed *fs.SeedFile) error {
 func getSeedSchema(seed *fs.SeedFile) (bigquery.Schema, error) {
 	schema := make([]*bigquery.FieldSchema, 0, len(seed.Columns))
 	// Use schema specified column types if available
-	for column, colType := range seed.ColumnTypes {
+	for _, column := range seed.Columns {
 		schema = append(schema, &bigquery.FieldSchema{
 			Name: column,
-			Type: bigquery.FieldType(strings.ToUpper(colType)),
+			Type: bigquery.FieldType(strings.ToUpper(seed.ColumnTypes[column])),
 		})
 	}
 	return schema, nil
