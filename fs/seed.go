@@ -81,7 +81,7 @@ func (s *SeedFile) readColumnTypes() error {
 	for _, column := range s.Columns {
 		colType, ok := cfg.ColumnTypes[column]
 		if !ok || colType == "" {
-			return fmt.Errorf("No column type specified for %s column `%s`", s.Path, column)
+			colType = "string" // default to string
 		}
 		if s.ColumnTypes == nil {
 			s.ColumnTypes = make(map[string]string)
