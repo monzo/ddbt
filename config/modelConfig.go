@@ -21,6 +21,7 @@ type ModelConfig struct {
 // https://docs.getdbt.com/reference/model-configs#general-configurations
 type GeneralConfig struct {
 	Enabled     bool
+	Schema      string
 	Tags        []string
 	PreHooks    []string
 	PostHooks   []string
@@ -212,10 +213,11 @@ func readGeneralConfig(
 			}
 
 		case "schema":
-			_, err := asStr("schema", value, strExecutor)
+			schema, err := asStr("schema", value, strExecutor)
 			if err != nil {
 				return nil, err
 			}
+			config.Schema = schema
 
 		case "alias":
 

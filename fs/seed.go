@@ -31,8 +31,17 @@ func (s *SeedFile) GetName() string {
 }
 
 func (s *SeedFile) GetTarget() (*config.Target, error) {
-	// No target overrides
-	return config.GlobalCfg.GetTargetFor(s.Path), nil
+	target := config.GlobalCfg.GetTargetFor(s.Path)
+	seedCfg, err := s.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Override dataset from config
+	if seedCfg.Schema != "" {
+		target.DataSet = seedCfg.Schema
+	}
+	return target, nil
 }
 
 func (s *SeedFile) GetConfig() (*config.SeedConfig, error) {

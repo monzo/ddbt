@@ -15,15 +15,41 @@ type SeedConfig struct {
 
 // GetSeedConfig returns the seed configuration for a given path.
 func (c *Config) GetSeedConfig(path string) *SeedConfig {
-	if c.seedConfig == nil {
-		return new(SeedConfig)
+	return c.GetFolderBasedSeedConfig(path)
+}
+
+// GetFolderBasedSeedConfig is a version of GetFolderConfig to
+// apply parent seed config hierarchically to child folders.
+func (c *Config) GetFolderBasedSeedConfig(path string) *SeedConfig {
+	configPath := "data"
+	parentConfig := c.seedConfig[configPath]
+	config := &SeedConfig{
+		GeneralConfig: GeneralConfig{
+			Enabled: parentConfig.Enabled,
+			Schema:  parentConfig.Schema,
+		},
+		QuoteColumns: parentConfig.QuoteColumns,
+		ColumnTypes:  parentConfig.ColumnTypes,
 	}
-	configKey := strings.TrimSuffix(path, ".csv")
-	if cfg, found := c.seedConfig[configKey]; found {
-		return cfg
+
+	parts := strings.Split(strings.TrimSuffix(path, ".csv"), string(os.PathSeparator))
+	for _, part := range parts[1:] {
+		configPath = fmt.Sprintf("%s%c%s", configPath, os.PathSeparator, part)
+		childConfig := c.seedConfig[configPath]
+		if childConfig != nil {
+			if childConfig.ColumnTypes != nil {
+				config.ColumnTypes = childConfig.ColumnTypes
+			}
+			if childConfig.Schema != "" {
+				config.Schema = childConfig.Schema
+			}
+			if childConfig.Enabled != config.Enabled {
+				config.Enabled = childConfig.Enabled
+			}
+		}
 	}
-	// No config specified
-	return new(SeedConfig)
+
+	return config
 }
 
 func readSeedCfg(seedCfg map[string]interface{}) (map[string]*SeedConfig, error) {
