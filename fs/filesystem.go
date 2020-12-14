@@ -187,6 +187,13 @@ func (fs *FileSystem) mapMacroLookupOptions(file *File) error {
 }
 
 func (fs *FileSystem) scanSeedDirectory(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			// Return early if seed directory doesn't exist.
+			return nil
+		}
+		return err
+	}
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		// If we've encountered an error walking this path, let's return now
 		if err != nil {
