@@ -24,13 +24,12 @@ const (
 )
 
 type ProgressBar struct {
-	label             string
-	completedItems    uint32
-	numberItems       uint32
-	output            io.Writer
-	startTime         time.Time
-	lastIncrementedMu sync.Mutex // prevent concurrent write to lastIncremented
-	lastIncremented   time.Time
+	label           string
+	completedItems  uint32
+	numberItems     uint32
+	output          io.Writer
+	startTime       time.Time
+	lastIncremented time.Time
 
 	started         bool
 	startMutex      sync.Mutex
@@ -65,9 +64,7 @@ func NewProgressBar(label string, numberItems int) *ProgressBar {
 
 func (pb *ProgressBar) Increment() {
 	atomic.AddUint32(&pb.completedItems, 1)
-	pb.lastIncrementedMu.Lock()
 	pb.lastIncremented = time.Now() // don't care about raising sets here, it's only for a rough guess of how fast we are
-	pb.lastIncrementedMu.Unlock()
 }
 
 func (pb *ProgressBar) Width() int {
