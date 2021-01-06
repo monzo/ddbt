@@ -20,7 +20,7 @@ func UnionAllTables(ec compilerInterface.ExecutionContext, caller compilerInterf
 	}
 
 	var builder strings.Builder
-
+	builder.WriteRune('(')
 	for i, table := range args[0].ListValue {
 		if i > 0 {
 			builder.WriteString(" UNION ALL \n")
@@ -40,7 +40,7 @@ func UnionAllTables(ec compilerInterface.ExecutionContext, caller compilerInterf
 		builder.WriteString(table.AsStringValue())
 		builder.WriteRune(')')
 	}
-
+	builder.WriteRune(')')
 	return compilerInterface.NewString(builder.String()), nil
 }
 
