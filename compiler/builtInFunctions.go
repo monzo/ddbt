@@ -102,6 +102,20 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 
 	"ref": refFunction,
 
+	"replace": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		if len(args) != 3 {
+			return nil, ec.ErrorAt(caller, fmt.Sprintf("replace requires 3 parameters, got %d", len(args)))
+		}
+
+		value := strings.Replace(
+			args[0].Value.AsStringValue(),
+			args[1].Value.AsStringValue(),
+			args[2].Value.AsStringValue(),
+			1,
+		)
+		return compilerInterface.NewString(value), nil
+	},
+
 	"return": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 		if len(args) != 1 {
 			return nil, ec.ErrorAt(caller, fmt.Sprintf("return requires 1 parameter, got %d", len(args)))
