@@ -8,21 +8,48 @@ import (
 
 // SeedConfig represents the seed configuration specified in dbt_project.yml
 type SeedConfig struct {
+	GeneralConfig
 	QuoteColumns bool              `yaml:"quote_columns"`
 	ColumnTypes  map[string]string `yaml:"column_types"`
 }
 
 // GetSeedConfig returns the seed configuration for a given path.
 func (c *Config) GetSeedConfig(path string) *SeedConfig {
-	if c.seedConfig == nil {
-		return new(SeedConfig)
+	return c.GetFolderBasedSeedConfig(path)
+}
+
+// GetFolderBasedSeedConfig is a version of GetFolderConfig to
+// apply parent seed config hierarchically to child folders.
+func (c *Config) GetFolderBasedSeedConfig(path string) *SeedConfig {
+	configPath := "data"
+	parentConfig := c.seedConfig[configPath]
+	config := &SeedConfig{
+		GeneralConfig: GeneralConfig{
+			Enabled: parentConfig.Enabled,
+			Schema:  parentConfig.Schema,
+		},
+		QuoteColumns: parentConfig.QuoteColumns,
+		ColumnTypes:  parentConfig.ColumnTypes,
 	}
-	configKey := strings.TrimSuffix(path, ".csv")
-	if cfg, found := c.seedConfig[configKey]; found {
-		return cfg
+
+	parts := strings.Split(strings.TrimSuffix(path, ".csv"), string(os.PathSeparator))
+	for _, part := range parts[1:] {
+		configPath = fmt.Sprintf("%s%c%s", configPath, os.PathSeparator, part)
+		childConfig := c.seedConfig[configPath]
+		if childConfig != nil {
+			if childConfig.ColumnTypes != nil {
+				config.ColumnTypes = childConfig.ColumnTypes
+			}
+			if childConfig.Schema != "" {
+				config.Schema = childConfig.Schema
+			}
+			if childConfig.Enabled != config.Enabled {
+				config.Enabled = childConfig.Enabled
+			}
+		}
 	}
-	// No config specified
-	return new(SeedConfig)
+
+	return config
 }
 
 func readSeedCfg(seedCfg map[string]interface{}) (map[string]*SeedConfig, error) {
@@ -41,17 +68,20 @@ type seedConfigParser struct {
 
 func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]interface{}) error {
 	subFolders := make(map[string]map[string]interface{})
-	var cfg *SeedConfig
+	var cfg SeedConfig
 
-	for key, value := range seedCfg {
+	// Process common general configurations.
+	remaining, err := readGeneralConfig(&cfg.GeneralConfig, seedCfg, simpleStringExecutor)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range remaining {
 		switch key {
 		case "quote_columns":
 			b, err := asBool(key, value)
 			if err != nil {
 				return err
-			}
-			if cfg == nil {
-				cfg = new(SeedConfig)
 			}
 			cfg.QuoteColumns = b
 
@@ -59,9 +89,6 @@ func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]i
 			kvm, err := asKeyValueStringMap(key, value)
 			if err != nil {
 				return err
-			}
-			if cfg == nil {
-				cfg = new(SeedConfig)
 			}
 			cfg.ColumnTypes = kvm
 
@@ -82,20 +109,22 @@ func (p *seedConfigParser) readCfgForDir(pathPrefix string, seedCfg map[string]i
 
 			subFolders[key] = kvm
 		}
+	}
 
-		if cfg != nil {
-			// Config found for "data/{pathPrefix}.csv"
-			p.SeedConfigs[pathPrefix] = cfg
-		}
-
-		// Recurse into sub folders
-		for name, value := range subFolders {
-			if err := p.readCfgForDir(fmt.Sprintf("%s%c%s", pathPrefix, os.PathSeparator, name), value); err != nil {
-				return err
-			}
+	// Recurse into sub folders
+	for name, value := range subFolders {
+		if err := p.readCfgForDir(fmt.Sprintf("%s%c%s", pathPrefix, os.PathSeparator, name), value); err != nil {
+			return err
 		}
 	}
+
+	p.SeedConfigs[pathPrefix] = &cfg
+
 	return nil
+}
+
+func simpleStringExecutor(s string) (string, error) {
+	return s, nil
 }
 
 // asKeyValueStringMap converts value to a map[string]string.

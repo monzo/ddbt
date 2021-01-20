@@ -132,9 +132,11 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 	if seedCfg, found := project.Seeds[project.Name]; found {
 		cfg, err := readSeedCfg(seedCfg)
 		if err != nil {
-			return nil, err
+			// if parsing of seed section of config has failed, don't error
+			fmt.Fprintf(os.Stderr, "⚠️ Cannot parse seed config: %v\n", err)
+		} else {
+			GlobalCfg.seedConfig = cfg
 		}
-		GlobalCfg.seedConfig = cfg
 	}
 
 	return GlobalCfg, nil

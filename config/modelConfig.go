@@ -8,23 +8,37 @@ import (
 	"strings"
 )
 
+// ModelConfig represents model configurations.
+//
+// https://docs.getdbt.com/reference/model-configs
 type ModelConfig struct {
-	Enabled      bool
-	Tags         []string
-	PreHooks     []string
-	PostHooks    []string
+	GeneralConfig
 	Materialized string
-	PersistDocs  struct {
+}
+
+// GeneralConfig represents common 'general' configurations.
+//
+// https://docs.getdbt.com/reference/model-configs#general-configurations
+type GeneralConfig struct {
+	Enabled     bool
+	Schema      string
+	Tags        []string
+	PreHooks    []string
+	PostHooks   []string
+	PersistDocs struct {
 		Relation bool
 		Columns  bool
 	}
+	FullRefresh bool
 }
 
 var defaultConfig = ModelConfig{
-	Enabled:      true,
-	Tags:         []string{},
-	PreHooks:     []string{},
-	PostHooks:    []string{},
+	GeneralConfig: GeneralConfig{
+		Enabled:   true,
+		Tags:      []string{},
+		PreHooks:  []string{},
+		PostHooks: []string{},
+	},
 	Materialized: "table",
 }
 
@@ -60,50 +74,14 @@ func readGeneralFolderBasedConfig(m map[string]interface{}, strExecutor func(s s
 func readSubFolder(folderName string, config ModelConfig, m map[string]interface{}, strExecutor func(s string) (string, error)) error {
 	subFolders := make(map[string]map[string]interface{})
 
-	for key, value := range m {
+	// Read common 'general' configurations.
+	remaining, err := readGeneralConfig(&config.GeneralConfig, m, strExecutor)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range remaining {
 		switch key {
-		case "enabled":
-			if b, ok := value.(bool); ok {
-				config.Enabled = b
-			} else {
-				return errors.New(fmt.Sprintf("Unable to convert `enabled` to boolean, got: %v", reflect.TypeOf(value)))
-			}
-
-		case "tags":
-			list, err := strOrList("tags", value, strExecutor)
-			if err != nil {
-				return err
-			}
-			config.Tags = list
-
-		case "pre_hook":
-			list, err := strOrList("pre_hook", value, strExecutor)
-			if err != nil {
-				return err
-			}
-			config.PreHooks = list
-
-		case "post_hook":
-			list, err := strOrList("post_hook", value, strExecutor)
-			if err != nil {
-				return err
-			}
-			config.PostHooks = list
-
-		case "database":
-			_, err := asStr("database", value, strExecutor)
-			if err != nil {
-				return err
-			}
-
-		case "schema":
-			_, err := asStr("schema", value, strExecutor)
-			if err != nil {
-				return err
-			}
-
-		case "persist_docs":
-
 		case "materialized":
 			materialized, err := asStr("materialized", value, strExecutor)
 			if err != nil {
@@ -182,4 +160,85 @@ func asStr(name string, value interface{}, strExecutor func(s string) (string, e
 	}
 
 	return strValue, nil
+}
+
+// readGeneralConfig reads and consumes common 'general configurations'
+// config keys and return all the remaining key/value (or error).
+//
+// https://docs.getdbt.com/reference/model-configs#general-configurations
+func readGeneralConfig(
+	config *GeneralConfig,
+	m map[string]interface{},
+	strExecutor func(s string) (string, error),
+) (map[string]interface{}, error) {
+	if config == nil {
+		return nil, fmt.Errorf("General config is not writable")
+	}
+
+	var remaining map[string]interface{}
+	for key, value := range m {
+		switch key {
+		case "enabled":
+			if b, ok := value.(bool); ok {
+				config.Enabled = b
+			} else {
+				return nil, fmt.Errorf("Unable to convert `enabled` to boolean, got: %v", reflect.TypeOf(value))
+			}
+
+		case "tags":
+			list, err := strOrList("tags", value, strExecutor)
+			if err != nil {
+				return nil, err
+			}
+			config.Tags = list
+
+		case "pre_hook":
+			list, err := strOrList("pre_hook", value, strExecutor)
+			if err != nil {
+				return nil, err
+			}
+			config.PreHooks = list
+
+		case "post_hook":
+			list, err := strOrList("post_hook", value, strExecutor)
+			if err != nil {
+				return nil, err
+			}
+			config.PostHooks = list
+
+		case "database":
+			_, err := asStr("database", value, strExecutor)
+			if err != nil {
+				return nil, err
+			}
+
+		case "schema":
+			schema, err := asStr("schema", value, strExecutor)
+			if err != nil {
+				return nil, err
+			}
+			config.Schema = schema
+
+		case "alias":
+
+		case "persist_docs":
+
+		case "full_refresh":
+			if b, ok := value.(bool); ok {
+				config.FullRefresh = b
+			} else {
+				return nil, fmt.Errorf("Unable to convert `full_refresh` to boolean, got: %v", reflect.TypeOf(value))
+			}
+
+		default:
+			// For any key not part of general configurations,
+			// copy to remaining to be processed later.
+			if remaining == nil {
+				remaining = make(map[string]interface{})
+			}
+			remaining[key] = value
+		}
+	}
+
+	return remaining, nil
 }

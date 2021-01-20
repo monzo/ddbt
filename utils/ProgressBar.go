@@ -171,7 +171,7 @@ func (pb *ProgressBar) lastUpdateTime() time.Time {
 }
 
 func (pb *ProgressBar) String(termWidth int) string {
-	completed := pb.completedItems // Because this is atomically updated, grab a local reference
+	completed := atomic.LoadUint32(&pb.completedItems) // Because this is atomically updated, grab a local reference
 	percentage := float64(completed) / float64(pb.numberItems)
 
 	if percentage != percentage {

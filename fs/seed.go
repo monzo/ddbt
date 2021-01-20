@@ -31,8 +31,17 @@ func (s *SeedFile) GetName() string {
 }
 
 func (s *SeedFile) GetTarget() (*config.Target, error) {
-	// No target overrides
-	return config.GlobalCfg.GetTargetFor(s.Path), nil
+	target := config.GlobalCfg.GetTargetFor(s.Path)
+	seedCfg, err := s.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Override dataset from config
+	if seedCfg.Schema != "" {
+		target.DataSet = seedCfg.Schema
+	}
+	return target, nil
 }
 
 func (s *SeedFile) GetConfig() (*config.SeedConfig, error) {
@@ -72,7 +81,7 @@ func (s *SeedFile) readColumnTypes() error {
 	for _, column := range s.Columns {
 		colType, ok := cfg.ColumnTypes[column]
 		if !ok || colType == "" {
-			return fmt.Errorf("No column type specified for %s column `%s`", s.Path, column)
+			colType = "string" // default to string
 		}
 		if s.ColumnTypes == nil {
 			s.ColumnTypes = make(map[string]string)
