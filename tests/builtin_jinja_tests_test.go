@@ -396,3 +396,16 @@ func TestIsUpper(t *testing.T) {
 {%- if b is not upper -%}Pass{% else %}Fail{% endif -%}
 `)
 }
+
+func TestReplace(t *testing.T) {
+	assertCompileOutput(t,
+		`PassPassPass`,
+		`
+{%- set a = "hello world" | replace(" world", "") -%}
+{%- set b = "hello world" | replace("hello ", "") -%}
+{%- set c = "hello world" | replace("cat", "") -%}
+{%- if a == "hello" -%}Pass{% else %}Fail{% endif -%}
+{%- if b == "world" -%}Pass{% else %}Fail{% endif -%}
+{%- if c == "hello world" -%}Pass{% else %}Fail{% endif -%}
+`)
+}
