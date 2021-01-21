@@ -8,8 +8,29 @@ projects (3000+ data models). This project attempts to be a direct drop in repla
 
 *Warning:* This is experimental and may not work exactly as you expect
 
-## Command Quickstart
+## Installation
+1. Clone this repo
+```bash
+$ git clone git@github.com:monzo/ddbt.git
+```
 
+2. Change directory into cloned repo
+```bash
+$ cd ddbt
+```
+
+3. Install (requires go-lang)
+```bash
+$ go install
+```
+
+4. Confirm installation
+```bash
+$ ddbt --version
+ddbt version 0.2.1
+```
+
+## Command Quickstart
 - `ddbt run` will compile and execute all your models, or those filtered for, against your data warehouse
 - `ddbt test` will run all tests referencing all your models, or those filtered for, in your project against your data warehouse
 - `ddbt show my_model` will output the compiled SQL to the terminal
