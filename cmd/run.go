@@ -51,10 +51,10 @@ func addModelsFlag(cmd *cobra.Command) {
 }
 
 func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
-	fmt.Printf("ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
+	_, _ = fmt.Fprintf(os.Stderr, "ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
 
 	// Read the models on the file system
-	fileSystem, err := fs.ReadFileSystem(os.Stdout)
+	fileSystem, err := fs.ReadFileSystem(os.Stderr)
 	if err != nil {
 		fmt.Printf("❌ Unable to read filesystem: %s\n", err)
 		os.Exit(1)
