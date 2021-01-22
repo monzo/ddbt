@@ -47,7 +47,7 @@ func NewProgressBar(label string, numberItems int) *ProgressBar {
 		label:           label,
 		completedItems:  0,
 		numberItems:     uint32(numberItems),
-		output:          os.Stdout,
+		output:          os.Stderr,
 		startTime:       time.Now(),
 		lastIncremented: time.Now(),
 

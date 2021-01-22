@@ -209,6 +209,19 @@ func (f *File) Downstreams() []*File {
 	return downstreams
 }
 
+// All the upstreams in this file
+func (f *File) Upstreams() []*File {
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+
+	upstreams := make([]*File, 0, len(f.upstreams))
+	for upstream := range f.upstreams {
+		upstreams = append(upstreams, upstream)
+	}
+
+	return upstreams
+}
+
 func (f *File) MaskAsDynamicSQL() {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()

@@ -12,7 +12,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(showDAG)
-	showDAG.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
+	addModelsFlag(showDAG)
 }
 
 var showDAG = &cobra.Command{

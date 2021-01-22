@@ -15,7 +15,8 @@ type Config struct {
 	Target *Target
 
 	// Custom behaviour which allows us to override the target information on a per folder basis within `/models/`
-	ModelGroups map[string]*Target
+	ModelGroups     map[string]*Target
+	ModelGroupsFile string
 
 	// seedConfig holds the seed (global) configurations
 	seedConfig map[string]*SeedConfig
@@ -119,6 +120,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 		}
 
 		GlobalCfg.ModelGroups = modelGroups
+		GlobalCfg.ModelGroupsFile = appConfig.ModelGroupsFile
 	}
 
 	if settings, found := project.Models[project.Name]; found {

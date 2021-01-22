@@ -198,6 +198,46 @@ func (g *Graph) addDownstreamModels(file *File, visited map[*File]struct{}) {
 	}
 }
 
+func (g *Graph) AddAllUsedMacros() error {
+	visited := make(map[*File]struct{})
+
+	for file := range g.nodes {
+		g.addUpstreamMacros(file, visited)
+	}
+
+	// Check for circular dependencies & all nodes without upstreams
+	for file := range visited {
+		node := g.getNodeFor(file)
+
+		if node.upstreamContains(node) {
+			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+		}
+	}
+
+	return nil
+}
+
+func (g *Graph) addUpstreamMacros(file *File, visited map[*File]struct{}) {
+	if _, found := visited[file]; found {
+		return
+	}
+	visited[file] = struct{}{}
+
+	thisNode := g.getNodeFor(file)
+
+	file.Mutex.Lock()
+	defer file.Mutex.Unlock()
+	for upstream := range file.upstreams {
+		if upstream.Type == MacroFile {
+			upstreamNode := g.getNodeFor(upstream)
+
+			g.edge(upstreamNode, thisNode)
+
+			g.addUpstreamMacros(upstream, visited)
+		}
+	}
+}
+
 // Find all tests which reference the models in the existing graph
 // and add them to the graph
 //
@@ -403,4 +443,9 @@ func (g *Graph) NumberNodesNeedRerunning() int {
 	}
 
 	return count
+}
+
+func (g *Graph) Contains(file *File) bool {
+	_, found := g.nodes[file]
+	return found
 }
