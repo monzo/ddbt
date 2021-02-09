@@ -6,6 +6,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const FileVersion = 2
+
 // Represents what can be held within a DBT properties file
 type File struct {
 	Version   int    `yaml:"version"`             // What version of the schema we're on (always 2)
@@ -56,10 +58,10 @@ type Models []*Model
 // A model/seed/snapshot schema
 type Model struct {
 	Name        string   `yaml:"name"`
-	Description string   `yaml:"description,omitempty"`
+	Description string   `yaml:"description"`
 	Docs        Docs     `yaml:"docs,omitempty"`
 	Meta        MetaData `yaml:"meta,omitempty"`
-	Tests       Tests    `yaml:"tests,omitempty"`   // Model level tests
+	Tests       Tests    `yaml:"tests"`             // Model level tests
 	Columns     Columns  `yaml:"columns,omitempty"` // Columns
 }
 
@@ -96,10 +98,10 @@ type Columns []Column
 // Represents a single column within a Model schema
 type Column struct {
 	Name        string   `yaml:"name"`
-	Description string   `yaml:"description,omitempty"`
+	Description string   `yaml:"description"`
 	Meta        MetaData `yaml:"meta,omitempty"`
 	Quote       bool     `yaml:"quote,omitempty"`
-	Tests       Tests    `yaml:"tests,omitempty"`
+	Tests       Tests    `yaml:"tests"`
 	Tags        []string `yaml:"tags,omitempty,flow"`
 }
 
