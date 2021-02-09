@@ -1,19 +1,3 @@
-// TODO;
-
-// helpers
-// - YML encoder helper (Unmarshal already exists)
-// - Search for model relating to passed model name, if not present throw error
-// - if present search for yml file of the same name
-
-// generate file
-// - if not found generate whole yml file
-// - if found parse yml to Go Struct
-// - get big query table - zero rows but with column names
-// - iterate through column names and add to YML struct (if not in file already)
-// - iterate through yml struct and if names not in schema remove them
-// - finally marshall
-// - useful logging at each step
-
 package cmd
 
 import (
