@@ -64,8 +64,6 @@ var schemaGenCmd = &cobra.Command{
 		// create schema file
 		ymlPath, schemaFile := generateEmptySchemaFile(model)
 
-		fmt.Println(model.Schema == nil)
-
 		if model.Schema == nil {
 			fmt.Println("\n🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file")
 			schemaModel := generateNewSchemaModel(modelName, bqColumns)
