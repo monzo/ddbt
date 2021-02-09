@@ -19,6 +19,7 @@ package cmd
 import (
 	"ddbt/bigquery"
 	"ddbt/config"
+	"ddbt/fs"
 	"ddbt/properties"
 
 	"fmt"
@@ -40,6 +41,8 @@ var schemaGenCmd = &cobra.Command{
 	Args:  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		modelName := args[0]
+
+		// get filesystem, model and target
 		fileSystem, _ := compileAllModels()
 		model := fileSystem.Model(modelName)
 
@@ -48,8 +51,9 @@ var schemaGenCmd = &cobra.Command{
 			fmt.Println("could not get target for schema")
 			os.Exit(1)
 		}
-		fmt.Println("🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
+		fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
+		// retrieve columns from BigQuery
 		bqColumns, err := GetColumnsForModel(modelName, target)
 		if err != nil {
 			fmt.Println("Could not retrieve schema")
@@ -57,26 +61,14 @@ var schemaGenCmd = &cobra.Command{
 		}
 		fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
 
-		// get schema path to write the schema yml file to
-		ymlPath := strings.Replace(model.Path, ".sql", ".yml", 1)
+		// create schema file
+		ymlPath, schemaFile := generateEmptySchemaFile(model)
 
-		schemaFile := properties.File{}
-		schemaFile.Version = properties.FileVersion
+		fmt.Println(model.Schema == nil)
 
 		if model.Schema == nil {
-			fmt.Println("🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file (Not implemented)")
-
-			schemaModel := properties.Model{}
-			schemaModel.Name = modelName
-			schemaModel.Description = "Please fill this in with a useful description.."
-
-			schemaModel.Columns = []properties.Column{}
-			for _, bqCol := range bqColumns {
-				column := properties.Column{}
-				column.Name = bqCol
-				schemaModel.Columns = append(schemaModel.Columns, column)
-			}
-
+			fmt.Println("\n🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file")
+			schemaModel := generateNewSchemaModel(modelName, bqColumns)
 			schemaFile.Models = properties.Models{&schemaModel}
 
 			ymlBody := marshalYML(schemaFile)
@@ -85,44 +77,26 @@ var schemaGenCmd = &cobra.Command{
 				fmt.Println("Error writing YML to file in path")
 				os.Exit(1)
 			}
-			fmt.Println("✅ " + modelName + "schema successfully written to path: " + ymlPath)
+			fmt.Println("\n✅ " + modelName + "schema successfully written to path: " + ymlPath)
 
 		} else {
-			fmt.Println("🔍 " + modelName + " schema file found.. 🛠  Updating schema file (Not implemented)")
-			// spew.Dump(model.Schema)
+			fmt.Println("\n🔍 " + modelName + " schema file found.. 🛠  Updating schema file")
+
+			// set working schema model to current schema model
 			schemaModel := model.Schema
+			// add and remove columns in-place
+			addMissingColumnsToSchema(schemaModel, bqColumns)
+			removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
+			schemaFile.Models = properties.Models{schemaModel}
 
-			// check if bq column is in schema (add missing)
-			columnsAdded := []string{}
-			for _, bqCol := range bqColumns {
-				columnFound := FindColumnInSchema(bqCol, schemaModel)
-				if !columnFound {
-					column := properties.Column{}
-					column.Name = bqCol
-					schemaModel.Columns = append(schemaModel.Columns, column)
-					columnsAdded = append(columnsAdded, bqCol)
-				}
+			ymlBody := marshalYML(schemaFile)
+			err = WriteYMLToFile(ymlPath, ymlBody)
+			if err != nil {
+				fmt.Println("Error writing YML to file in path")
+				os.Exit(1)
 			}
-			fmt.Println("➕ Columns added to Schema (from BQ table):", columnsAdded)
-
-			// check if schema column in bq (remove missing)
-			columnsRemoved := []string{}
-			columnsKept := properties.Columns{}
-			for _, schemaCol := range schemaModel.Columns {
-				columnFound := FindSchemaColumnInSlice(schemaCol, bqColumns)
-				if !columnFound {
-					columnsRemoved = append(columnsRemoved, schemaCol.Name)
-				} else {
-					columnsKept = append(columnsKept, schemaCol)
-				}
-			}
-			schemaModel.Columns = columnsKept
-			fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
-
-			yml := marshalYML(schemaModel)
-			fmt.Println(yml)
+			fmt.Println("\n✅ " + modelName + "schema successfully updated at path: " + ymlPath)
 		}
-
 	},
 }
 
@@ -164,6 +138,62 @@ func WriteYMLToFile(filePath string, body string) error {
 	return nil
 }
 
+// generate an empty schema file which will be populated according to existing yml schemas and the bigquery schema.
+// Returns the local path for the yml file and the yml file struct
+func generateEmptySchemaFile(model *fs.File) (ymlPath string, schemaFile properties.File) {
+	ymlPath = strings.Replace(model.Path, ".sql", ".yml", 1)
+	schemaFile = properties.File{}
+	schemaFile.Version = properties.FileVersion
+	return ymlPath, schemaFile
+}
+
+// generate a new schema model for the provided model name and bqcolumns
+// this is used when then is no existing model
+func generateNewSchemaModel(modelName string, bqColumns []string) properties.Model {
+	schemaModel := properties.Model{}
+	schemaModel.Name = modelName
+	schemaModel.Description = "Please fill this in with a useful description.."
+	schemaModel.Columns = []properties.Column{}
+	for _, bqCol := range bqColumns {
+		column := properties.Column{}
+		column.Name = bqCol
+		schemaModel.Columns = append(schemaModel.Columns, column)
+	}
+
+	return schemaModel
+}
+
+// check if bq column is in schema (add missing)
+func addMissingColumnsToSchema(schemaModel *properties.Model, bqColumns []string) {
+	columnsAdded := []string{}
+	for _, bqCol := range bqColumns {
+		columnFound := FindColumnInSchema(bqCol, schemaModel)
+		if !columnFound {
+			column := properties.Column{}
+			column.Name = bqCol
+			schemaModel.Columns = append(schemaModel.Columns, column)
+			columnsAdded = append(columnsAdded, bqCol)
+		}
+	}
+	fmt.Println("➕ Columns added to Schema (from BQ table):", columnsAdded)
+}
+
+// check if schema column in bq (remove missing)
+func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []string) {
+	columnsRemoved := []string{}
+	columnsKept := properties.Columns{}
+	for _, schemaCol := range schemaModel.Columns {
+		columnFound := FindSchemaColumnInSlice(schemaCol, bqColumns)
+		if !columnFound {
+			columnsRemoved = append(columnsRemoved, schemaCol.Name)
+		} else {
+			columnsKept = append(columnsKept, schemaCol)
+		}
+	}
+	schemaModel.Columns = columnsKept
+	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
+}
+
 func FindColumnInSchema(column string, schema *properties.Model) bool {
 	for _, schemacol := range schema.Columns {
 		if schemacol.Name == column {
@@ -180,8 +210,4 @@ func FindSchemaColumnInSlice(column properties.Column, columnSlice []string) boo
 		}
 	}
 	return false
-}
-
-func removeColumnIndex(slice []properties.Column, s int) []properties.Column {
-	return append(slice[:s], slice[s+1:]...)
 }
