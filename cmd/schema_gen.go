@@ -71,7 +71,7 @@ var schemaGenCmd = &cobra.Command{
 	},
 }
 
-func GetColumnsForModel(modelName string, target *config.Target) ([]string, error) {
+func getColumnsForModel(modelName string, target *config.Target) ([]string, error) {
 	schema, err := bigquery.GetColumnsFromTable(modelName, target)
 	if err != nil {
 		return nil, err
