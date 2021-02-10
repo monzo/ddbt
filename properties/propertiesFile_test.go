@@ -45,6 +45,7 @@ models:
     - unique:
         severity: warn
 - name: another_model
+  description: ""
 macros:
 - name: my_macro
   description: some macro which does stuff
