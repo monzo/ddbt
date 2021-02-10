@@ -113,9 +113,14 @@ func generateNewSchemaModel(modelName string, bqColumns []string) *properties.Mo
 // check if bq column is in schema (add missing)
 func addMissingColumnsToSchema(schemaModel *properties.Model, bqColumns []string) {
 	columnsAdded := []string{}
+
+	schemaColumnMap := make(map[string]bool)
+	for _, schemaCol := range schemaModel.Columns {
+		schemaColumnMap[schemaCol.Name] = true
+	}
+
 	for _, bqCol := range bqColumns {
-		columnFound := FindColumnInSchema(bqCol, schemaModel)
-		if !columnFound {
+		if _, exists := schemaColumnMap[bqCol]; !exists {
 			column := properties.Column{}
 			column.Name = bqCol
 			schemaModel.Columns = append(schemaModel.Columns, column)
@@ -129,9 +134,14 @@ func addMissingColumnsToSchema(schemaModel *properties.Model, bqColumns []string
 func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []string) {
 	columnsRemoved := []string{}
 	columnsKept := properties.Columns{}
+
+	bqColumnMap := make(map[string]bool)
+	for _, bqCol := range bqColumns {
+		bqColumnMap[bqCol] = true
+	}
+
 	for _, schemaCol := range schemaModel.Columns {
-		columnFound := FindSchemaColumnInSlice(schemaCol, bqColumns)
-		if !columnFound {
+		if _, exists := bqColumnMap[schemaCol.Name]; !exists {
 			columnsRemoved = append(columnsRemoved, schemaCol.Name)
 		} else {
 			columnsKept = append(columnsKept, schemaCol)
@@ -139,22 +149,4 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	}
 	schemaModel.Columns = columnsKept
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
-}
-
-func FindColumnInSchema(column string, schema *properties.Model) bool {
-	for _, schemacol := range schema.Columns {
-		if schemacol.Name == column {
-			return true
-		}
-	}
-	return false
-}
-
-func FindSchemaColumnInSlice(column properties.Column, columnSlice []string) bool {
-	for _, col := range columnSlice {
-		if column.Name == col {
-			return true
-		}
-	}
-	return false
 }
