@@ -40,6 +40,7 @@ ddbt version 0.2.1
 - `ddbt watch --skip-run` is the same as watch, but will skip the initial run (preventing you having to wait for all the models to run) before running the tests and starting to watch your file system.
 - `ddbt completion zsh` will generate a shell completion script zsh (or bash if you pass that as argument). Detailed steps to set up the completion script can be found in `ddbt completion --help`
 - `ddbt isolate-dag` will create a temporary directory and symlink in all files needed for the given _model_filter_ such that Fishtown's DBT could be run against it without having to be run against every model in your data warehouse
+- `ddbt schema-gen my_model` will output a new or updated schema yml file for the model provided in the same directory as the dbt model file. (Note: this does not currenly support the `-m` flag for model dependencies)
 
 ### Global Arguments
 - `--models model_filter` _or_ `-m model_filter`: Instead of running for every model in your project, DDBT will only execute against the requested models. See filters below for what is accepted for `my_model`
