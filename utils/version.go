@@ -1,3 +1,3 @@
 package utils
 
-const DdbtVersion = "0.3.0"
+const DdbtVersion = "0.4.0"
