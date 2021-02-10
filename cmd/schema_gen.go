@@ -100,7 +100,7 @@ func generateNewSchemaModel(modelName string, bqColumns []string) *properties.Mo
 	schemaModel := &properties.Model{}
 	schemaModel.Name = modelName
 	schemaModel.Description = "Please fill this in with a useful description.."
-	schemaModel.Columns = []properties.Column{}
+	schemaModel.Columns = make([]properties.Column, 0, len(bqColumns))
 	for _, bqCol := range bqColumns {
 		column := properties.Column{}
 		column.Name = bqCol
