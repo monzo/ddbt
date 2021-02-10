@@ -37,7 +37,7 @@ var schemaGenCmd = &cobra.Command{
 		fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
 		// retrieve columns from BigQuery
-		bqColumns, err := GetColumnsForModel(modelName, target)
+		bqColumns, err := getColumnsForModel(modelName, target)
 		if err != nil {
 			fmt.Println("Could not retrieve schema")
 			os.Exit(1)
@@ -79,7 +79,7 @@ func getColumnsForModel(modelName string, target *config.Target) ([]string, erro
 
 	columns := []string{}
 	for _, fieldSchema := range schema {
-		column := fmt.Sprintf("%v", FieldSchema.Name)
+		column := fmt.Sprintf("%v", fieldSchema.Name)
 		columns = append(columns, column)
 	}
 	return columns, nil
