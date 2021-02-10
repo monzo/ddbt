@@ -78,7 +78,7 @@ func getColumnsForModel(modelName string, target *config.Target) ([]string, erro
 	}
 
 	columns := []string{}
-	for _, FieldSchema := range schema {
+	for _, fieldSchema := range schema {
 		column := fmt.Sprintf("%v", FieldSchema.Name)
 		columns = append(columns, column)
 	}
