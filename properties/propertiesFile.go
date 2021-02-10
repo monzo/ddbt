@@ -61,7 +61,7 @@ type Model struct {
 	Description string   `yaml:"description"`
 	Docs        Docs     `yaml:"docs,omitempty"`
 	Meta        MetaData `yaml:"meta,omitempty"`
-	Tests       Tests    `yaml:"tests"`             // Model level tests
+	Tests       Tests    `yaml:"tests,omitempty"`   // Model level tests
 	Columns     Columns  `yaml:"columns,omitempty"` // Columns
 }
 
