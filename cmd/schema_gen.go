@@ -20,10 +20,16 @@ func init() {
 }
 
 var schemaGenCmd = &cobra.Command{
+<<<<<<< HEAD
 	Use:               "schema_gen [model name]",
 	Short:             "Generates the YML schema file for a given model",
 	Args:              cobra.ExactValidArgs(1),
 	ValidArgsFunction: completeModelFn,
+=======
+	Use:   "schema-gen [model name]",
+	Short: "Generates the YML schema file for a given model",
+	Args:  cobra.ExactValidArgs(1),
+>>>>>>> 3da5ead9117c9162bbc01092dc7de843d72b5120
 	Run: func(cmd *cobra.Command, args []string) {
 		modelName := args[0]
 
