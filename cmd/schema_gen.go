@@ -18,7 +18,7 @@ func init() {
 }
 
 var schemaGenCmd = &cobra.Command{
-	Use:               "schema_gen [model name]",
+	Use:               "schema-gen [model name]",
 	Short:             "Generates the YML schema file for a given model",
 	Args:              cobra.ExactValidArgs(1),
 	ValidArgsFunction: completeModelFn,
