@@ -43,7 +43,7 @@ var runCmd = &cobra.Command{
 }
 
 func addModelsFlag(cmd *cobra.Command) {
-	cmd.Flags().StringSliceVarP(&ModelFilters, "models", "m", []string{}, "Select which model(s) to run")
+	cmd.Flags().StringArrayVarP(&ModelFilters, "models", "m", []string{}, "Select which model(s) to run")
 	err := cmd.RegisterFlagCompletionFunc("models", completeModelFilterFn)
 	if err != nil {
 		panic(err)
@@ -224,7 +224,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 				// Check if we want all upstreams
 				allUpstreams := modelFilter[0] == '+'
 				if allUpstreams {
-					modelFilters = modelFilters[1:]
+					modelFilter = modelFilter[1:]
 				}
 
 				allDownstreams := modelFilter[len(modelFilter)-1] == '+'
