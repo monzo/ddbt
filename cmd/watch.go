@@ -34,7 +34,7 @@ var watchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Do the initial build of the models and then add the tests
 		fileSystem, gc := compileAllModels()
-		graph := buildGraph(fileSystem, ModelFilter)
+		graph := buildGraph(fileSystem, ModelFilters)
 		testsToRun := graph.AddReferencingTests()
 
 		if !skipInitialBuild {
