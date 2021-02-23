@@ -107,7 +107,7 @@ func isolateGraph(graph *fs.Graph) {
 		model := string(modelBytes)
 		configBlockEndIndex := strings.Index(model, "}}")
 		if configBlockEndIndex == -1 {
-			fmt.Printf("❌ '%s' has no model config \n ", pathInProject)
+			fmt.Printf("❌ '%s' has no model config \n", pathInProject)
 			return touch(pathInProject)
 		}
 		configBlock := model[:configBlockEndIndex+2]
