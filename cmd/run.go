@@ -261,7 +261,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 	} else {
 		if err := graph.AddAllModels(fileSystem); err != nil {
 			pb.Stop()
-			fmt.Printf("❌ %s\n", modelFilters)
+			fmt.Printf("❌ %s\n", strings.Join(modelFilters, ", "))
 			os.Exit(1)
 		}
 	}
