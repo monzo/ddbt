@@ -58,6 +58,10 @@ func generateSchemaForModel(modelName string) error {
 	fileSystem, _ := compileAllModels()
 
 	model := fileSystem.Model(modelName)
+	if model == nil {
+		fmt.Println("could not load model from file system:", modelName)
+		return fmt.Errorf("Model not found: %s", modelName)
+	}
 
 	target, err := model.GetTarget()
 	if err != nil {
