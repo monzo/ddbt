@@ -22,7 +22,7 @@ var showDAG = &cobra.Command{
 		fileSystem, _ := compileAllModels()
 
 		// If we've been given a model to run, run it
-		graph := buildGraph(fileSystem, ModelFilter)
+		graph := buildGraph(fileSystem, ModelFilters)
 
 		printGraph(graph)
 	},

@@ -25,8 +25,8 @@ var isolateDAG = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fileSystem, _ := compileAllModels()
 
-		graph := buildGraph(fileSystem, ModelFilter) // Build the execution graph for the given command
-		graph.AddReferencingTests()                  // And then add any tests which reference that graph
+		graph := buildGraph(fileSystem, ModelFilters) // Build the execution graph for the given command
+		graph.AddReferencingTests()                   // And then add any tests which reference that graph
 
 		if err := graph.AddAllUsedMacros(); err != nil {
 			fmt.Printf("❌ Unable to get all used macros: %s\n", err)

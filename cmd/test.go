@@ -31,7 +31,7 @@ var testCmd = &cobra.Command{
 		fileSystem, globalContext := compileAllModels()
 
 		// If we've been given a model to run, run it
-		graph := buildGraph(fileSystem, ModelFilter)
+		graph := buildGraph(fileSystem, ModelFilters)
 
 		// Add all tests which reference the graph
 		tests := graph.AddReferencingTests()
