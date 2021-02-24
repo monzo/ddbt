@@ -144,6 +144,7 @@ func isolateGraph(graph *fs.Graph) {
 		"debug",
 		"docs",
 		"dbt_modules",
+		"macros/sampling.sql",
 	}
 
 	// If we have a model groups file bring that too
