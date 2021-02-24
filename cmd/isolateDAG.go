@@ -96,6 +96,47 @@ func isolateGraph(graph *fs.Graph) {
 		return nil
 	}
 
+	// Create a file containing only the config block which DBT can read
+	stubWithConfig := func(pathInProject string) error {
+		fullOrgPath := filepath.Join(cwd, pathInProject)
+		modelBytes, err := ioutil.ReadFile(fullOrgPath)
+		if err != nil {
+			fmt.Printf("❌ Unable to to read model: %s\n", err)
+			return touch(pathInProject)
+		}
+		model := string(modelBytes)
+		configBlockEndIndex := strings.Index(model, "}}")
+		if configBlockEndIndex == -1 {
+			fmt.Printf("❌ '%s' has no model config \n", pathInProject)
+			return touch(pathInProject)
+		}
+		configBlock := model[:configBlockEndIndex+2]
+
+		stubPath := filepath.Join(isolationDir, pathInProject)
+
+		// Create the folder in the isolated dir if needed
+		if err = os.MkdirAll(filepath.Dir(stubPath), os.ModePerm); err != nil {
+			fmt.Printf("❌ Unable to to create model dir: %s\n", err)
+			return touch(pathInProject)
+		}
+
+		// If the file doesn't exist create it with no contents
+		if _, err := os.Stat(stubPath); os.IsNotExist(err) {
+			file, err := os.OpenFile(stubPath, os.O_RDWR|os.O_CREATE, 0755)
+			if err != nil {
+				fmt.Printf("❌ Unable to open stub file to write: %s\n", err)
+				return touch(pathInProject)
+			}
+			if _, err = file.WriteString(configBlock); err != nil {
+				fmt.Printf("❌ Unable to write to stub file: %s\n", err)
+				return touch(pathInProject)
+			}
+			return file.Close()
+		}
+
+		return nil
+	}
+
 	projectFiles := []string{
 		"dbt_project.yml",
 		"ddbt_config.yml",
@@ -146,7 +187,7 @@ func isolateGraph(graph *fs.Graph) {
 			case fs.ModelFile:
 				// Model's outside of the DAG but referenced by it need to exist for DBT to be able to run on this DAG
 				// even if we run with the upstream command
-				if err := touch(upstream.Path); err != nil {
+				if err := stubWithConfig(upstream.Path); err != nil {
 					pb.Stop()
 					fmt.Printf("❌ Unable to touch %s `%s`: %s\n", upstream.Type, upstream.Name, err)
 					return err
