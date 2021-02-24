@@ -13,62 +13,91 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var schemaGenModel string
+
 func init() {
 	rootCmd.AddCommand(schemaGenCmd)
+	// Note: one model, not model filter
+	addModelFlag(schemaGenCmd)
 }
 
 var schemaGenCmd = &cobra.Command{
 	Use:               "schema-gen [model name]",
 	Short:             "Generates the YML schema file for a given model",
-	Args:              cobra.ExactValidArgs(1),
+	Args:              cobra.RangeArgs(0, 1),
 	ValidArgsFunction: completeModelFn,
 	Run: func(cmd *cobra.Command, args []string) {
-		modelName := args[0]
+		switch {
+		case len(args) == 0 && schemaGenModel == "":
+			fmt.Println("Please specify model with schema-gen -m model-name")
+			os.Exit(1)
+		case len(args) == 1 && schemaGenModel != "":
+			fmt.Println("Please specify model with either schema-gen model-name or schema-gen -m model-name but not both")
+			os.Exit(1)
+		case len(args) == 1:
+			schemaGenModel = args[0]
+		}
 
-		// get filesystem, model and target
-		fileSystem, _ := compileAllModels()
-		model := fileSystem.Model(modelName)
-
-		target, err := model.GetTarget()
-		if err != nil {
-			fmt.Println("could not get target for schema")
+		if err := generateSchemaForModel(schemaGenModel); err != nil {
+			fmt.Printf("❌ %s\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
-
-		// retrieve columns from BigQuery
-		bqColumns, err := getColumnsForModel(modelName, target)
-		if err != nil {
-			fmt.Println("Could not retrieve schema")
-			os.Exit(1)
-		}
-		fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
-
-		// create schema file
-		ymlPath, schemaFile := generateEmptySchemaFile(model)
-		var schemaModel *properties.Model
-
-		if model.Schema == nil {
-			fmt.Println("\n🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file")
-			schemaModel = generateNewSchemaModel(modelName, bqColumns)
-
-		} else {
-			fmt.Println("\n🔍 " + modelName + " schema file found.. 🛠  Updating schema file")
-			// set working schema model to current schema model
-			schemaModel = model.Schema
-			// add and remove columns in-place
-			addMissingColumnsToSchema(schemaModel, bqColumns)
-			removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
-		}
-
-		schemaFile.Models = properties.Models{schemaModel}
-		err = schemaFile.WriteToFile(ymlPath)
-		if err != nil {
-			fmt.Println("Error writing YML to file in path")
-			os.Exit(1)
-		}
-		fmt.Println("\n✅ " + modelName + "schema successfully updated at path: " + ymlPath)
 	},
+}
+
+func addModelFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&schemaGenModel, "model", "m", "", "Select which model to generate schema for")
+	if err := cmd.RegisterFlagCompletionFunc("model", completeModelFn); err != nil {
+		panic(err)
+	}
+}
+
+// generateSchemaForModel generates a schema and writes yml for modelName.
+func generateSchemaForModel(modelName string) error {
+	// get filesystem, model and target
+	fileSystem, _ := compileAllModels()
+
+	model := fileSystem.Model(modelName)
+
+	target, err := model.GetTarget()
+	if err != nil {
+		fmt.Println("could not get target for schema")
+		return err
+	}
+	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
+
+	// retrieve columns from BigQuery
+	bqColumns, err := getColumnsForModel(modelName, target)
+	if err != nil {
+		fmt.Println("Could not retrieve schema")
+		return err
+	}
+	fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
+
+	// create schema file
+	ymlPath, schemaFile := generateEmptySchemaFile(model)
+	var schemaModel *properties.Model
+
+	if model.Schema == nil {
+		fmt.Println("\n🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file")
+		schemaModel = generateNewSchemaModel(modelName, bqColumns)
+	} else {
+		fmt.Println("\n🔍 " + modelName + " schema file found.. 🛠  Updating schema file")
+		// set working schema model to current schema model
+		schemaModel = model.Schema
+		// add and remove columns in-place
+		addMissingColumnsToSchema(schemaModel, bqColumns)
+		removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
+	}
+
+	schemaFile.Models = properties.Models{schemaModel}
+	err = schemaFile.WriteToFile(ymlPath)
+	if err != nil {
+		fmt.Println("Error writing YML to file in path")
+		return err
+	}
+	fmt.Println("\n✅ " + modelName + "schema successfully updated at path: " + ymlPath)
+	return nil
 }
 
 func getColumnsForModel(modelName string, target *config.Target) ([]string, error) {
