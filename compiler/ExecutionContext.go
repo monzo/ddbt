@@ -124,11 +124,11 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 		// target, rather than the target defined in "--target=target"
 		if target.ReadUpstream != nil && !upstream.IsInDAG() {
 			return compilerInterface.NewString(
-				"`" + target.ReadUpstream.ProjectID + "`.`" + target.ReadUpstream.DataSet + "`.`" + modelName + "`",
+				"`" + target.ReadUpstream.ProjectID + "." + target.ReadUpstream.DataSet + "." + modelName + "`",
 			), nil
 		} else {
 			return compilerInterface.NewString(
-				"`" + target.ProjectID + "`.`" + target.DataSet + "`.`" + modelName + "`",
+				"`" + target.ProjectID + "." + target.DataSet + "." + modelName + "`",
 			), nil
 		}
 
