@@ -245,7 +245,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 						pb.Stop()
 						os.Exit(1)
 					} else {
-						println("\n  ❓ Unable to find model:", modelFilter)
+						fmt.Fprintf(os.Stderr, "\n  ❓ Unable to find model: %s\n", modelFilter)
 						continue
 					}
 				}
