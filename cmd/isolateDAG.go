@@ -144,6 +144,7 @@ func isolateGraph(graph *fs.Graph) {
 		"debug",
 		"docs",
 		"dbt_modules",
+		"macros",
 	}
 
 	// If we have a model groups file bring that too
@@ -161,6 +162,15 @@ func isolateGraph(graph *fs.Graph) {
 
 	err = graph.Execute(func(file *fs.File) error {
 		// Symlink the file from the DAG into the isolated folder
+
+		// Currently ddbt doesn't use dbt materializations. dbt materializations contain macros.
+		// If one needs to override a macro used in a dbt materialization, isolate-dag will not bring the
+		// macro into the new isolated environment. Instead, we (as a temporary workaround) copy over the
+		// whole macros directory and don't symlink individual macros.
+		if file.Type == fs.MacroFile {
+			return nil
+		}
+
 		if err := symLink(file.Path); err != nil {
 			pb.Stop()
 			fmt.Printf("❌ Unable to isolate %s `%s`: %s\n", file.Type, file.Name, err)
