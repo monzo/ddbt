@@ -227,9 +227,7 @@ func NumberRows(query string, target *config.Target) (uint64, error) {
 	return itr.TotalRows, nil
 }
 
-func GetRows(query string, target *config.Target) ([][]Value, Schema, error) {
-	ctx := context.Background()
-
+func GetRows(ctx context.Context, query string, target *config.Target) ([][]Value, Schema, error) {
 	switch {
 	case target.ProjectID == "":
 		return nil, nil, errors.New("no project ID defined to run query against")
@@ -291,8 +289,14 @@ func GetRows(query string, target *config.Target) ([][]Value, Schema, error) {
 	return rows, schema, nil
 }
 
+// GetColumnsFromTable is a fallback GetColumnsFromTableWithContext
+// with a background context.
 func GetColumnsFromTable(table string, target *config.Target) (Schema, error) {
-	_, schema, err := GetRows(fmt.Sprintf("SELECT * FROM %s LIMIT 0", table), target)
+	return GetColumnsFromTableWithContext(context.Background(), table, target)
+}
+
+func GetColumnsFromTableWithContext(ctx context.Context, table string, target *config.Target) (Schema, error) {
+	_, schema, err := GetRows(ctx, fmt.Sprintf("SELECT * FROM %s LIMIT 0", table), target)
 	if err != nil {
 		return nil, err
 	}

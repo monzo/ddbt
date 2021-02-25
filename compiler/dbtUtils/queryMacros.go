@@ -1,6 +1,7 @@
 package dbtUtils
 
 import (
+	"context"
 	"ddbt/bigquery"
 	"ddbt/compilerInterface"
 	"fmt"
@@ -8,7 +9,13 @@ import (
 	"strings"
 )
 
+// GetColumnValues is a fallback GetColumnValuesWithContext
+// with a background context.
 func GetColumnValues(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
+	return GetColumnValuesWithContext(context.Background(), ec, caller, arguments)
+}
+
+func GetColumnValuesWithContext(ctx context.Context, ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
 	if isOnlyCompilingSQL(ec) {
 		return ec.MarkAsDynamicSQL()
 	}
@@ -39,7 +46,7 @@ func GetColumnValues(ec compilerInterface.ExecutionContext, caller compilerInter
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
 	}
 
-	rows, _, err := bigquery.GetRows(query, target)
+	rows, _, err := bigquery.GetRows(ctx, query, target)
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("get_column_values query returned an error: %s", err))
 	}
