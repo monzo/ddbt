@@ -17,6 +17,7 @@ import (
 func init() {
 	rootCmd.AddCommand(isolateDAG)
 	addModelsFlag(isolateDAG)
+	addFailOnNotFoundFlag(isolateDAG)
 }
 
 var isolateDAG = &cobra.Command{

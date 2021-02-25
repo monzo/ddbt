@@ -20,6 +20,7 @@ import (
 func init() {
 	rootCmd.AddCommand(testCmd)
 	addModelsFlag(testCmd)
+	addFailOnNotFoundFlag(testCmd)
 }
 
 var testCmd = &cobra.Command{

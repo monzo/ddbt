@@ -13,6 +13,7 @@ import (
 func init() {
 	rootCmd.AddCommand(showDAG)
 	addModelsFlag(showDAG)
+	addFailOnNotFoundFlag(showDAG)
 }
 
 var showDAG = &cobra.Command{

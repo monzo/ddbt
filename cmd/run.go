@@ -17,12 +17,14 @@ import (
 )
 
 var ModelFilters []string
+var FailOnNotFound bool
 
 const EnableSchemaBasedTests = false
 
 func init() {
 	rootCmd.AddCommand(runCmd)
 	addModelsFlag(runCmd)
+	addFailOnNotFoundFlag(runCmd)
 }
 
 var runCmd = &cobra.Command{
@@ -45,6 +47,14 @@ var runCmd = &cobra.Command{
 func addModelsFlag(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&ModelFilters, "models", "m", []string{}, "Select which model(s) to run")
 	err := cmd.RegisterFlagCompletionFunc("models", completeModelFilterFn)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func addFailOnNotFoundFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "fnf", true, "Select which model(s) to run")
+	err := cmd.RegisterFlagCompletionFunc("fail-on-not-found", completeModelFilterFn)
 	if err != nil {
 		panic(err)
 	}
@@ -234,8 +244,14 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 
 				model := fileSystem.Model(modelFilter)
 				if model == nil {
-					fmt.Printf("❓ Unable to find model: %s\n", modelFilter)
-					continue
+					if FailOnNotFound {
+						pb.Stop()
+						fmt.Printf("❌ Unable to find model: %s\n", strings.Join(modelFilters, ", "))
+						os.Exit(1)
+					} else {
+						fmt.Printf("❓ Unable to find model: %s\n", modelFilter)
+						continue
+					}
 				}
 
 				graph.AddNode(model)
