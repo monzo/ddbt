@@ -28,10 +28,14 @@ var isolateDAG = &cobra.Command{
 		graph := buildGraph(fileSystem, ModelFilters) // Build the execution graph for the given command
 		graph.AddReferencingTests()                   // And then add any tests which reference that graph
 
-		if err := graph.AddAllUsedMacros(); err != nil {
-			fmt.Printf("❌ Unable to get all used macros: %s\n", err)
-			os.Exit(1)
-		}
+		// Currently ddbt doesn't use dbt materializations. dbt materializations contain macros.
+		// If one needs to override a macro used in a dbt materialization, isolate-dag will not bring the
+		// macro into the new isolated environment. Instead, we (as a temporary workaround) copy over the
+		// whole macros directory.
+		//if err := graph.AddAllUsedMacros(); err != nil {
+		//	fmt.Printf("❌ Unable to get all used macros: %s\n", err)
+		//	os.Exit(1)
+		//}
 
 		isolateGraph(graph)
 	},
@@ -144,7 +148,7 @@ func isolateGraph(graph *fs.Graph) {
 		"debug",
 		"docs",
 		"dbt_modules",
-		"macros/sampling.sql",
+		"macros",
 	}
 
 	// If we have a model groups file bring that too
