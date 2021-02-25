@@ -22,7 +22,7 @@ var skipInitialBuild = false
 func init() {
 	rootCmd.AddCommand(watchCmd)
 	addModelsFlag(watchCmd)
-
+	addFailOnNotFoundFlag(watchCmd)
 	watchCmd.Flags().BoolVarP(&skipInitialBuild, "skip-run", "s", false, "Skip the initial execution of the DAG and go straight into watch mode")
 }
 
