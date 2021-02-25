@@ -53,7 +53,7 @@ func addModelsFlag(cmd *cobra.Command) {
 }
 
 func addFailOnNotFoundFlag(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "fnf", true, "Select which model(s) to run")
+	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "f", true, "Select which model(s) to run")
 	err := cmd.RegisterFlagCompletionFunc("fail-on-not-found", completeModelFilterFn)
 	if err != nil {
 		panic(err)
