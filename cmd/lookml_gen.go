@@ -39,13 +39,6 @@ const timeBlock string = `timeframes: [
 ]
 `
 
-// specify supportal linking for user_id
-const userIdLink string = `link: {
-  label: "Supportal"
-  url: "https://supportal.tools.prod.prod-ffs.io/users/{{ value }}"
-}
-`
-
 func init() {
 	rootCmd.AddCommand(lookmlGenCmd)
 }
@@ -121,10 +114,6 @@ func generateNewLookmlView(modelName string, target *config.Target) (error) {
 		} else {
 			newBlock += "dimension: " + colName + " {\n"
 			newBlock += "type: " + colDtype + "\n"
-		}
-
-		if colName == "user_id" {
-			newBlock += userIdLink
 		}
 		
 		newBlock += "sql: ${TABLE}." + colName + " ;;\n}\n"
