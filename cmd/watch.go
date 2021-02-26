@@ -22,7 +22,7 @@ var skipInitialBuild = false
 func init() {
 	rootCmd.AddCommand(watchCmd)
 	addModelsFlag(watchCmd)
-
+	addFailOnNotFoundFlag(watchCmd)
 	watchCmd.Flags().BoolVarP(&skipInitialBuild, "skip-run", "s", false, "Skip the initial execution of the DAG and go straight into watch mode")
 }
 
@@ -34,7 +34,7 @@ var watchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Do the initial build of the models and then add the tests
 		fileSystem, gc := compileAllModels()
-		graph := buildGraph(fileSystem, ModelFilter)
+		graph := buildGraph(fileSystem, ModelFilters)
 		testsToRun := graph.AddReferencingTests()
 
 		if !skipInitialBuild {

@@ -16,13 +16,15 @@ import (
 	"ddbt/utils"
 )
 
-var ModelFilter string
+var ModelFilters []string
+var FailOnNotFound bool
 
 const EnableSchemaBasedTests = false
 
 func init() {
 	rootCmd.AddCommand(runCmd)
 	addModelsFlag(runCmd)
+	addFailOnNotFoundFlag(runCmd)
 }
 
 var runCmd = &cobra.Command{
@@ -34,7 +36,7 @@ var runCmd = &cobra.Command{
 		fileSystem, globalContext := compileAllModels()
 
 		// If we've been given a model to run, run it
-		graph := buildGraph(fileSystem, ModelFilter)
+		graph := buildGraph(fileSystem, ModelFilters)
 
 		if err := executeGraph(graph, globalContext); err != nil {
 			os.Exit(1)
@@ -43,11 +45,15 @@ var runCmd = &cobra.Command{
 }
 
 func addModelsFlag(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&ModelFilter, "models", "m", "", "Select which model(s) to run")
+	cmd.Flags().StringArrayVarP(&ModelFilters, "models", "m", []string{}, "Select which model(s) to run")
 	err := cmd.RegisterFlagCompletionFunc("models", completeModelFilterFn)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func addFailOnNotFoundFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "f", true, "Fail if given models are not found")
 }
 
 func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
@@ -206,60 +212,67 @@ func compileTests(fileSystem *fs.FileSystem, gc *compiler.GlobalContext) {
 	)
 }
 
-func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
+func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 	pb := utils.NewProgressBar("🚧 Building DAG", 1)
 	defer pb.Stop()
 
 	graph := fs.NewGraph()
 
-	if modelFilter != "" {
-		if strings.HasPrefix(modelFilter, "tag:") {
-			if err := graph.AddFilesWithTag(fileSystem, modelFilter[4:]); err != nil {
-				pb.Stop()
-				fmt.Printf("❌ Unable to add models filtered by tag: %s", err)
-				os.Exit(1)
-			}
-		} else {
-			// Check if we want all upstreams
-			allUpstreams := modelFilter[0] == '+'
-			if allUpstreams {
-				modelFilter = modelFilter[1:]
-			}
-
-			allDownstreams := modelFilter[len(modelFilter)-1] == '+'
-			if allDownstreams {
-				modelFilter = modelFilter[:len(modelFilter)-1]
-			}
-
-			model := fileSystem.Model(modelFilter)
-			if model == nil {
-				pb.Stop()
-				fmt.Printf("❌ Unable to find model: %s\n", modelFilter)
-				os.Exit(1)
-			}
-
-			graph.AddNode(model)
-
-			if allUpstreams {
-				if err := graph.AddNodeAndUpstreams(model); err != nil {
+	if len(modelFilters) > 0 {
+		for _, modelFilter := range modelFilters {
+			if strings.HasPrefix(modelFilter, "tag:") {
+				if err := graph.AddFilesWithTag(fileSystem, modelFilter[4:]); err != nil {
 					pb.Stop()
-					fmt.Printf("❌ %s\n", err)
+					fmt.Printf("❌ Unable to add models filtered by tag: %s", err)
 					os.Exit(1)
 				}
-			}
+			} else {
+				// Check if we want all upstreams
+				allUpstreams := modelFilter[0] == '+'
+				if allUpstreams {
+					modelFilter = modelFilter[1:]
+				}
 
-			if allDownstreams {
-				if err := graph.AddNodeAndDownstreams(model); err != nil {
-					pb.Stop()
-					fmt.Printf("❌ %s\n", err)
-					os.Exit(1)
+				allDownstreams := modelFilter[len(modelFilter)-1] == '+'
+				if allDownstreams {
+					modelFilter = modelFilter[:len(modelFilter)-1]
+				}
+
+				model := fileSystem.Model(modelFilter)
+				if model == nil {
+					if FailOnNotFound {
+						pb.Stop()
+						fmt.Printf("❌ Unable to find model: %s\n", modelFilter)
+						os.Exit(1)
+					} else {
+						fmt.Fprintf(os.Stderr, "\n  ❓ Unable to find model: %s\n", modelFilter)
+						continue
+					}
+				}
+
+				graph.AddNode(model)
+
+				if allUpstreams {
+					if err := graph.AddNodeAndUpstreams(model); err != nil {
+						pb.Stop()
+						fmt.Printf("❌ %s\n", err)
+						os.Exit(1)
+					}
+				}
+
+				if allDownstreams {
+					if err := graph.AddNodeAndDownstreams(model); err != nil {
+						pb.Stop()
+						fmt.Printf("❌ %s\n", err)
+						os.Exit(1)
+					}
 				}
 			}
 		}
 	} else {
 		if err := graph.AddAllModels(fileSystem); err != nil {
 			pb.Stop()
-			fmt.Printf("❌ %s\n", modelFilter)
+			fmt.Printf("❌ %s\n", strings.Join(modelFilters, ", "))
 			os.Exit(1)
 		}
 	}
@@ -267,7 +280,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilter string) *fs.Graph {
 	pb.Increment()
 
 	if graph.Len() == 0 {
-		fmt.Printf("❌ Empty DAG generated for model filter: %s\n", modelFilter)
+		fmt.Printf("❌ Empty DAG generated for model filter: %s\n", strings.Join(modelFilters, ", "))
 		os.Exit(1)
 	}
 
