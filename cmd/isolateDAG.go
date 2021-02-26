@@ -188,7 +188,7 @@ func isolateGraph(graph *fs.Graph) {
 			}
 		}
 
-		// Ensure usptream models are handled
+		// Ensure upstream models are handled
 		for _, upstream := range file.Upstreams() {
 			if graph.Contains(upstream) {
 				continue
@@ -202,6 +202,15 @@ func isolateGraph(graph *fs.Graph) {
 					pb.Stop()
 					fmt.Printf("❌ Unable to touch %s `%s`: %s\n", upstream.Type, upstream.Name, err)
 					return err
+				}
+				// Symlink the schema if it exists
+				schemaFile := strings.TrimSuffix(upstream.Path, filepath.Ext(upstream.Path)) + ".yml"
+				if _, err := os.Stat(schemaFile); upstream.Schema != nil && err == nil {
+					if err := symLink(schemaFile); err != nil {
+						pb.Stop()
+						fmt.Printf("❌ Unable to isolate schema for upstream model %s `%s`: %s\n", upstream.Type, upstream.Name, err)
+						return err
+					}
 				}
 
 			default:
