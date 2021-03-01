@@ -269,6 +269,28 @@ func (g *Graph) AddReferencingTests() []*File {
 	return tests
 }
 
+// AddEphemeralUpstreams brings any upstream models that are ephemeral into the graph
+func (g *Graph) AddEphemeralUpstreams() {
+	for _, node := range g.nodes {
+		if node.file.Type != ModelFile {
+			continue
+		}
+
+		for upstream := range node.file.upstreams {
+			if upstream.Type != ModelFile {
+				continue
+			}
+
+			if upstream.GetMaterialization() != "ephemeral" {
+				continue
+			}
+
+			upstreamNode := g.getNodeFor(upstream)
+			g.edge(node, upstreamNode)
+		}
+	}
+}
+
 func (g *Graph) Len() int {
 	return len(g.nodes)
 }
