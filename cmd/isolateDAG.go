@@ -98,11 +98,23 @@ func isolateGraph(graph *fs.Graph) {
 	}
 
 	// Create a file containing only the config block which DBT can read
-	stubWithConfig := func(pathInProject string) error {
+	stubWithConfig := func(file *fs.File) error {
+		pathInProject := file.Path
+
+		// Include the full file if the model is ephemeral, otherwise empty CTEs are injected to models downstream of slurpees and queries break
+		if file.GetMaterialization() == "ephemeral" {
+			err := symLink(file.Path)
+			if err != nil {
+				fmt.Printf("❌ Unable to symlink ephemeral model: %s\n, including config block only", err)
+			} else {
+				return nil
+			}
+		}
+
 		fullOrgPath := filepath.Join(cwd, pathInProject)
 		modelBytes, err := ioutil.ReadFile(fullOrgPath)
 		if err != nil {
-			fmt.Printf("❌ Unable to to read model: %s\n", err)
+			fmt.Printf("❌ Unable to read model: %s\n", err)
 			return touch(pathInProject)
 		}
 		model := string(modelBytes)
@@ -198,7 +210,7 @@ func isolateGraph(graph *fs.Graph) {
 			case fs.ModelFile:
 				// Model's outside of the DAG but referenced by it need to exist for DBT to be able to run on this DAG
 				// even if we run with the upstream command
-				if err := stubWithConfig(upstream.Path); err != nil {
+				if err := stubWithConfig(upstream); err != nil {
 					pb.Stop()
 					fmt.Printf("❌ Unable to touch %s `%s`: %s\n", upstream.Type, upstream.Name, err)
 					return err
