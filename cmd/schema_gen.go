@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"ddbt/bigquery"
 	"ddbt/config"
 	"ddbt/fs"
 	"ddbt/properties"
+	"ddbt/utils"
 
 	"fmt"
 	"os"
@@ -15,64 +17,110 @@ import (
 
 func init() {
 	rootCmd.AddCommand(schemaGenCmd)
+	addModelsFlag(schemaGenCmd)
 }
 
 var schemaGenCmd = &cobra.Command{
 	Use:               "schema-gen [model name]",
 	Short:             "Generates the YML schema file for a given model",
-	Args:              cobra.ExactValidArgs(1),
+	Args:              cobra.RangeArgs(0, 1),
 	ValidArgsFunction: completeModelFn,
 	Run: func(cmd *cobra.Command, args []string) {
-		modelName := args[0]
+		switch {
+		case len(args) == 0 && len(ModelFilters) == 0:
+			fmt.Println("Please specify model with schema-gen -m model-name")
+			os.Exit(1)
+		case len(args) == 1 && len(ModelFilters) > 0:
+			fmt.Println("Please specify model with either schema-gen model-name or schema-gen -m model-name but not both")
+			os.Exit(1)
+		case len(args) == 1:
+			// This will actually allow something weird like
+			// ddbt schema-gen +model+
+			ModelFilters = append(ModelFilters, args[0])
+		}
 
-		// get filesystem, model and target
+		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
-		model := fileSystem.Model(modelName)
+		graph := buildGraph(fileSystem, ModelFilters)
 
-		target, err := model.GetTarget()
-		if err != nil {
-			fmt.Println("could not get target for schema")
+		// Generate schema for every file in the graph concurrently.
+		if err := generateSchemaForGraph(graph); err != nil {
+			fmt.Printf("❌ %s\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
-
-		// retrieve columns from BigQuery
-		bqColumns, err := getColumnsForModel(modelName, target)
-		if err != nil {
-			fmt.Println("Could not retrieve schema")
-			os.Exit(1)
-		}
-		fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
-
-		// create schema file
-		ymlPath, schemaFile := generateEmptySchemaFile(model)
-		var schemaModel *properties.Model
-
-		if model.Schema == nil {
-			fmt.Println("\n🔍 " + modelName + " schema file not found.. 🌱 Generating new schema file")
-			schemaModel = generateNewSchemaModel(modelName, bqColumns)
-
-		} else {
-			fmt.Println("\n🔍 " + modelName + " schema file found.. 🛠  Updating schema file")
-			// set working schema model to current schema model
-			schemaModel = model.Schema
-			// add and remove columns in-place
-			addMissingColumnsToSchema(schemaModel, bqColumns)
-			removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
-		}
-
-		schemaFile.Models = properties.Models{schemaModel}
-		err = schemaFile.WriteToFile(ymlPath)
-		if err != nil {
-			fmt.Println("Error writing YML to file in path")
-			os.Exit(1)
-		}
-		fmt.Println("\n✅ " + modelName + "schema successfully updated at path: " + ymlPath)
 	},
 }
 
-func getColumnsForModel(modelName string, target *config.Target) ([]string, error) {
-	schema, err := bigquery.GetColumnsFromTable(modelName, target)
+func generateSchemaForGraph(graph *fs.Graph) error {
+	pb := utils.NewProgressBar("🖨️ Generating schemas", graph.Len())
+	defer pb.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return graph.Execute(func(file *fs.File) error {
+		if file.Type == fs.ModelFile {
+			if err := generateSchemaForModel(ctx, file); err != nil {
+				pb.Stop()
+
+				if err != context.Canceled {
+					fmt.Printf("❌ %s\n", err)
+				}
+
+				cancel()
+				return err
+			}
+		}
+
+		pb.Increment()
+		return nil
+	}, config.NumberThreads(), pb)
+}
+
+// generateSchemaForModel generates a schema and writes yml for modelName.
+func generateSchemaForModel(ctx context.Context, model *fs.File) error {
+	target, err := model.GetTarget()
+	if err != nil {
+		fmt.Println("could not get target for schema")
+		return err
+	}
+	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
+
+	// retrieve columns from BigQuery
+	bqColumns, err := getColumnsForModel(ctx, model.Name, target)
+	if err != nil {
+		fmt.Println("Could not retrieve schema")
+		return err
+	}
+	fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
+
+	// create schema file
+	ymlPath, schemaFile := generateEmptySchemaFile(model)
+	var schemaModel *properties.Model
+
+	if model.Schema == nil {
+		fmt.Println("\n🔍 " + model.Name + " schema file not found.. 🌱 Generating new schema file")
+		schemaModel = generateNewSchemaModel(model.Name, bqColumns)
+	} else {
+		fmt.Println("\n🔍 " + model.Name + " schema file found.. 🛠  Updating schema file")
+		// set working schema model to current schema model
+		schemaModel = model.Schema
+		// add and remove columns in-place
+		addMissingColumnsToSchema(schemaModel, bqColumns)
+		removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
+	}
+
+	schemaFile.Models = properties.Models{schemaModel}
+	err = schemaFile.WriteToFile(ymlPath)
+	if err != nil {
+		fmt.Println("Error writing YML to file in path")
+		return err
+	}
+	fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
+	return nil
+}
+
+func getColumnsForModel(ctx context.Context, modelName string, target *config.Target) ([]string, error) {
+	schema, err := bigquery.GetColumnsFromTableWithContext(ctx, modelName, target)
 	if err != nil {
 		return nil, err
 	}

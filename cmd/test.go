@@ -46,7 +46,7 @@ var testCmd = &cobra.Command{
 func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext, graph *fs.Graph) bool {
 	pb := utils.NewProgressBar("🔬 Running Tests", len(tests))
 
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var m sync.Mutex
 	widestTestName := 0
@@ -88,7 +88,7 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext, graph
 					// schema tests: applied in YAML, returns the number of records that do not pass an assertion —
 					// when this number is 0, all records pass, therefore, your test passes
 					var results [][]bigquery.Value
-					results, _, err = bigquery.GetRows(query, target)
+					results, _, err = bigquery.GetRows(ctx, query, target)
 
 					if err == nil {
 						if len(results) != 1 {
