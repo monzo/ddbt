@@ -41,6 +41,7 @@ ddbt version 0.2.1
 - `ddbt completion zsh` will generate a shell completion script zsh (or bash if you pass that as argument). Detailed steps to set up the completion script can be found in `ddbt completion --help`
 - `ddbt isolate-dag` will create a temporary directory and symlink in all files needed for the given _model_filter_ such that Fishtown's DBT could be run against it without having to be run against every model in your data warehouse
 - `ddbt schema-gen -m my_model` will output a new or updated schema yml file for the model provided in the same directory as the dbt model file.
+- `ddbt lookml-gen my_model` will generate lookml view and copy it to your clipboard
 
 ### Global Arguments
 - `--models model_filter` _or_ `-m model_filter`: Instead of running for every model in your project, DDBT will only execute against the requested models. See filters below for what is accepted for `my_model`
