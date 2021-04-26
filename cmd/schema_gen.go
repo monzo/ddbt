@@ -41,23 +41,24 @@ var schemaGenCmd = &cobra.Command{
 
 		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
-		for k, v := range fileSystem.Docs {
-			fmt.Println("key:", k, "value:", v)
+		//for k, v := range fileSystem.Docs {
+		//	fmt.Println("key:", k, "value:", v)
+		//}
+
+		graph := buildGraph(fileSystem, ModelFilters)
+		//allDocs := allDocFiles(fileSystem)
+		// Generate schema for every file in the graph concurrently.
+		if err := generateSchemaForGraph(graph); err != nil {
+			fmt.Printf("❌ %s\n", err)
+			os.Exit(1)
 		}
-
-		// graph := buildGraph(fileSystem, ModelFilters)
-
-		// // Generate schema for every file in the graph concurrently.
-		// if err := generateSchemaForGraph(graph); err != nil {
-		// 	fmt.Printf("❌ %s\n", err)
-		// 	os.Exit(1)
-		// }
 		os.Exit(1)
 
 	},
 }
 
 func generateSchemaForGraph(graph *fs.Graph) error {
+	allDocs := allDocFiles()
 	pb := utils.NewProgressBar("🖨️ Generating schemas", graph.Len())
 	defer pb.Stop()
 
@@ -65,7 +66,7 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 
 	return graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
-			if err := generateSchemaForModel(ctx, file); err != nil {
+			if err := generateSchemaForModel(ctx, file, allDocs); err != nil {
 				pb.Stop()
 
 				if err != context.Canceled {
@@ -83,7 +84,7 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
-func generateSchemaForModel(ctx context.Context, model *fs.File) error {
+func generateSchemaForModel(ctx context.Context, model *fs.File, allDocs []string) error {
 	target, err := model.GetTarget()
 	if err != nil {
 		fmt.Println("could not get target for schema")
@@ -114,6 +115,7 @@ func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 		addMissingColumnsToSchema(schemaModel, bqColumns)
 		removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
 	}
+	suggestDocs(schemaModel, allDocs)
 
 	schemaFile.Models = properties.Models{schemaModel}
 	err = schemaFile.WriteToFile(ymlPath)
@@ -203,4 +205,44 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	}
 	schemaModel.Columns = columnsKept
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
+}
+
+func suggestDocs(schemaModel *properties.Model, allDocFiles []string) {
+	var docSuggestions []string
+
+	for _, col := range schemaModel.Columns {
+		if col.Description != "" {
+			if contains(allDocFiles, col.Name) {
+				docSuggestions = append(docSuggestions, col.Name)
+			}
+		}
+	}
+
+	fmt.Println("➖ Found existing docs for columns:", docSuggestions)
+	fmt.Println("➖ Would you like to add docs for these columns (y/N)?")
+	var userPrompt string
+	fmt.Scanln(&userPrompt)
+
+	if userPrompt == "y" {
+		addSuggestedDocs(schemaModel, docSuggestions)
+	}
+}
+
+
+func addSuggestedDocs(schemaModel *properties.Model, docSuggestions []string) {
+	for _, col := range schemaModel.Columns {
+		if contains(docSuggestions, col.Name) {
+			col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
+		}
+	}
+}
+
+
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }
