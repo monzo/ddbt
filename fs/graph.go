@@ -300,6 +300,10 @@ func (g *Graph) Len() int {
 	return len(g.nodes)
 }
 
+func (g *Graph) ListNodes() map[*File]*Node {
+	return g.nodes
+}
+
 func (g *Graph) Execute(f func(file *File) error, numWorkers int, pb *utils.ProgressBar) error {
 	var wait sync.WaitGroup
 

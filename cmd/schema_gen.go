@@ -7,6 +7,7 @@ import (
 	"ddbt/fs"
 	"ddbt/properties"
 	"ddbt/utils"
+	"sync"
 
 	"fmt"
 	"os"
@@ -18,11 +19,6 @@ import (
 func init() {
 	rootCmd.AddCommand(schemaGenCmd)
 	addModelsFlag(schemaGenCmd)
-}
-
-type ModelSuggestedDocs struct {
-	ModelName string
-	
 }
 
 var schemaGenCmd = &cobra.Command{
@@ -46,14 +42,20 @@ var schemaGenCmd = &cobra.Command{
 
 		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
-		//for k, v := range fileSystem.Docs {
-		//	fmt.Println("key:", k, "value:", v)
-		//}
 
 		graph := buildGraph(fileSystem, ModelFilters)
-		//allDocs := allDocFiles(fileSystem)
+
 		// Generate schema for every file in the graph concurrently.
 		if err := generateSchemaForGraph(graph); err != nil {
+			fmt.Printf("❌ %s\n", err)
+			os.Exit(1)
+		}
+
+		// refresh the graph state for doc suggestions
+		fmt.Println("\n👯‍♂️ Re-generating graph for doc string suggestions")
+		graph = buildGraph(fileSystem, ModelFilters)
+
+		if err := suggestDocsForGraph(graph); err != nil {
 			fmt.Printf("❌ %s\n", err)
 			os.Exit(1)
 		}
@@ -63,13 +65,12 @@ var schemaGenCmd = &cobra.Command{
 }
 
 func generateSchemaForGraph(graph *fs.Graph) error {
-	allDocs := allDocFiles()
 	pb := utils.NewProgressBar("🖨️ Generating schemas", graph.Len())
 	defer pb.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	graph.Execute(func(file *fs.File) error {
+	return graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
 			if err := generateSchemaForModel(ctx, file); err != nil {
 				pb.Stop()
@@ -87,30 +88,73 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 		return nil
 	}, config.NumberThreads(), pb)
 
-	var results = make([]string, len(jobs))
+}
 
-	pb = utils.NewProgressBar("🖨️ Suggesting docs", graph.Len())
-	graph.Execute(func(file *fs.File) error {
+type DocSuggestions struct {
+	mu          sync.Mutex
+	suggestions map[string][]string
+}
+
+func (d *DocSuggestions) AppendSuggestion(modelName string, modelSuggestions []string) {
+	d.mu.Lock()
+	d.suggestions[modelName] = modelSuggestions
+	d.mu.Unlock()
+}
+
+func (d *DocSuggestions) Init() {
+	d.mu.Lock()
+	d.suggestions = make(map[string][]string)
+	d.mu.Unlock()
+
+}
+
+func (d *DocSuggestions) Value() (suggestions map[string][]string) {
+	d.mu.Lock()
+	suggestions = d.suggestions
+	d.mu.Unlock()
+	return
+}
+
+func suggestDocsForGraph(graph *fs.Graph) error {
+	allDocs := allDocFiles()
+
+	pb := utils.NewProgressBar("🎁 Suggesting docs", graph.Len())
+
+	var docSugs DocSuggestions
+	docSugs.Init()
+	err := graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
-			suggestDocs(file, allDocs)
+			modelName, modelSuggestions := suggestDocs(file, allDocs)
+			docSugs.AppendSuggestion(modelName, modelSuggestions)
 		}
 
 		pb.Increment()
 		return nil
 	}, config.NumberThreads(), pb)
-
-	fmt.Println("➖ Found existing docs for columns")
-	fmt.Println("➖ Would you like to add docs (y/N)?")
-	var userPrompt string
-	fmt.Scanln(&userPrompt)
-
-	if userPrompt == "y" {
-		err = schemaFile.WriteToFile(ymlPath)
-		if err != nil {
-			fmt.Println("Error writing YML to file in path")
-			return err
-		}
+	if err != nil {
+		return err
 	}
+	pb.Stop()
+
+	for k, v := range docSugs.Value() {
+		fmt.Println("\nModel:", k, "\nSuggestions:", v)
+	}
+
+	fmt.Println(len(docSugs.Value()))
+
+	return nil
+	// fmt.Println("➖ Found existing docs for columns")
+	// fmt.Println("➖ Would you like to add docs (y/N)?")
+	// var userPrompt string
+	// fmt.Scanln(&userPrompt)
+
+	// if userPrompt == "y" {
+	// 	err = schemaFile.WriteToFile(ymlPath)
+	// 	if err != nil {
+	// 		fmt.Println("Error writing YML to file in path")
+	// 		return err
+	// 	}
+	// }
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
@@ -237,18 +281,20 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
 }
 
-func suggestDocs(file *fs.File, allDocFiles []string) {
-	var docSuggestions []string
+func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
+	var modelSuggestions []string
 	schemaModel := file.Schema
 
 	for _, col := range schemaModel.Columns {
 		if col.Description == "" {
 			if contains(allDocFiles, col.Name) {
 				col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
-				docSuggestions = append(docSuggestions, col.Name)
+				modelSuggestions = append(modelSuggestions, col.Name)
 			}
 		}
 	}
+
+	return schemaModel.Name, modelSuggestions
 
 	//fmt.Println("➖ Found existing docs for columns:", docSuggestions)
 	//fmt.Println("➖ Would you like to add docs for these columns (y/N)?")
