@@ -20,6 +20,11 @@ func init() {
 	addModelsFlag(schemaGenCmd)
 }
 
+type ModelSuggestedDocs struct {
+	ModelName string
+	
+}
+
 var schemaGenCmd = &cobra.Command{
 	Use:               "schema-gen [model name]",
 	Short:             "Generates the YML schema file for a given model",
@@ -64,9 +69,9 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return graph.Execute(func(file *fs.File) error {
+	graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
-			if err := generateSchemaForModel(ctx, file, allDocs); err != nil {
+			if err := generateSchemaForModel(ctx, file); err != nil {
 				pb.Stop()
 
 				if err != context.Canceled {
@@ -81,10 +86,35 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 		pb.Increment()
 		return nil
 	}, config.NumberThreads(), pb)
+
+	var results = make([]string, len(jobs))
+
+	pb = utils.NewProgressBar("🖨️ Suggesting docs", graph.Len())
+	graph.Execute(func(file *fs.File) error {
+		if file.Type == fs.ModelFile {
+			suggestDocs(file, allDocs)
+		}
+
+		pb.Increment()
+		return nil
+	}, config.NumberThreads(), pb)
+
+	fmt.Println("➖ Found existing docs for columns")
+	fmt.Println("➖ Would you like to add docs (y/N)?")
+	var userPrompt string
+	fmt.Scanln(&userPrompt)
+
+	if userPrompt == "y" {
+		err = schemaFile.WriteToFile(ymlPath)
+		if err != nil {
+			fmt.Println("Error writing YML to file in path")
+			return err
+		}
+	}
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
-func generateSchemaForModel(ctx context.Context, model *fs.File, allDocs []string) error {
+func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 	target, err := model.GetTarget()
 	if err != nil {
 		fmt.Println("could not get target for schema")
@@ -115,7 +145,6 @@ func generateSchemaForModel(ctx context.Context, model *fs.File, allDocs []strin
 		addMissingColumnsToSchema(schemaModel, bqColumns)
 		removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
 	}
-	suggestDocs(schemaModel, allDocs)
 
 	schemaFile.Models = properties.Models{schemaModel}
 	err = schemaFile.WriteToFile(ymlPath)
@@ -124,6 +153,7 @@ func generateSchemaForModel(ctx context.Context, model *fs.File, allDocs []strin
 		return err
 	}
 	fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
+
 	return nil
 }
 
@@ -207,36 +237,36 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
 }
 
-func suggestDocs(schemaModel *properties.Model, allDocFiles []string) {
+func suggestDocs(file *fs.File, allDocFiles []string) {
 	var docSuggestions []string
+	schemaModel := file.Schema
 
 	for _, col := range schemaModel.Columns {
-		if col.Description != "" {
+		if col.Description == "" {
 			if contains(allDocFiles, col.Name) {
+				col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
 				docSuggestions = append(docSuggestions, col.Name)
 			}
 		}
 	}
 
-	fmt.Println("➖ Found existing docs for columns:", docSuggestions)
-	fmt.Println("➖ Would you like to add docs for these columns (y/N)?")
-	var userPrompt string
-	fmt.Scanln(&userPrompt)
-
-	if userPrompt == "y" {
-		addSuggestedDocs(schemaModel, docSuggestions)
-	}
+	//fmt.Println("➖ Found existing docs for columns:", docSuggestions)
+	//fmt.Println("➖ Would you like to add docs for these columns (y/N)?")
+	//var userPrompt string
+	//fmt.Scanln(&userPrompt)
+	//
+	//if userPrompt == "y" {
+	//	addSuggestedDocs(schemaModel, docSuggestions)
+	//}
 }
 
-
-func addSuggestedDocs(schemaModel *properties.Model, docSuggestions []string) {
-	for _, col := range schemaModel.Columns {
-		if contains(docSuggestions, col.Name) {
-			col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
-		}
-	}
-}
-
+//func addSuggestedDocs(schemaModel *properties.Model, docSuggestions []string) {
+//	for _, col := range schemaModel.Columns {
+//		if contains(docSuggestions, col.Name) {
+//			col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
+//		}
+//	}
+//}
 
 func contains(s []string, str string) bool {
 	for _, v := range s {
