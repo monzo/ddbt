@@ -41,13 +41,19 @@ var schemaGenCmd = &cobra.Command{
 
 		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
-		graph := buildGraph(fileSystem, ModelFilters)
-
-		// Generate schema for every file in the graph concurrently.
-		if err := generateSchemaForGraph(graph); err != nil {
-			fmt.Printf("❌ %s\n", err)
-			os.Exit(1)
+		for k, v := range fileSystem.Docs {
+			fmt.Println("key:", k, "value:", v)
 		}
+
+		// graph := buildGraph(fileSystem, ModelFilters)
+
+		// // Generate schema for every file in the graph concurrently.
+		// if err := generateSchemaForGraph(graph); err != nil {
+		// 	fmt.Printf("❌ %s\n", err)
+		// 	os.Exit(1)
+		// }
+		os.Exit(1)
+
 	},
 }
 
