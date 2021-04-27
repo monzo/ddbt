@@ -270,12 +270,12 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
 }
 
-func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
+func suggestDocs(file *fs.File, allDocFiles map[string]interface{}) (string, []string) {
 	var modelSuggestions []string
 
 	for ind, col := range file.Schema.Columns {
 		if col.Description == "" {
-			if contains(allDocFiles, col.Name) {
+			if _, found := allDocFiles[col.Name]; found {
 				// update column description on file pointer
 				file.Schema.Columns[ind].Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
 				modelSuggestions = append(modelSuggestions, col.Name)
@@ -317,13 +317,4 @@ func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
 		}
 	}
 	return nil
-}
-
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }

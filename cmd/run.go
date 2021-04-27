@@ -86,12 +86,12 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	return fileSystem, gc
 }
 
-func allDocFiles() []string {
+func allDocFiles() map[string]interface{} {
 	fileSystem := readFileSystem()
 
-	var docFiles []string
+	docFiles := make(map[string]interface{})
 	for _, doc := range fileSystem.Docs {
-		docFiles = append(docFiles, doc.Name)
+		docFiles[doc.Name] = nil
 	}
 
 	return docFiles
