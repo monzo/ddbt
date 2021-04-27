@@ -456,6 +456,13 @@ func (g *Graph) MarkGraphAsFullyRun() {
 	}
 }
 
+func (g *Graph) UnmarkGraphAsFullyRun() {
+	for _, node := range g.nodes {
+		node.queuedToRun = false
+		node.hasRun = false
+	}
+}
+
 // If a file is in the graph, this removes it's queuedToRun and hasRun flags
 func (g *Graph) UnmarkFileAsRun(file *File) {
 	node, found := g.nodes[file]

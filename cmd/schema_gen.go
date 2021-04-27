@@ -52,9 +52,8 @@ var schemaGenCmd = &cobra.Command{
 		}
 
 		// refresh the graph state for doc suggestions
-		fmt.Println("\n🌀 Re-generating graph for doc string suggestions")
-		//fileSystem, _ = compileAllModels()
-		graph = buildGraph(fileSystem, ModelFilters)
+		fmt.Println("\n🌀 Resetting graph run status for doc string suggestions")
+		graph.UnmarkGraphAsFullyRun()
 
 		if err := suggestDocsForGraph(graph); err != nil {
 			fmt.Printf("❌ %s\n", err)
