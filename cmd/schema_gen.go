@@ -142,7 +142,6 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 	docSugsMap := docSugs.Value()
 	if len(docSugsMap) > 0 {
 		fmt.Println("\n📄 Found existing doc files for columns in the following models: ")
-
 		for k, v := range docSugsMap {
 			if len(v) > 10 {
 				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
@@ -150,7 +149,6 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
 			}
 		}
-
 		fmt.Println("➖ Would you like to add docs (y/N)?")
 
 		var userPrompt string
