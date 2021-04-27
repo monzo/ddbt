@@ -130,7 +130,6 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 				docSugs.AppendSuggestion(modelName, modelSuggestions)
 			}
 		}
-
 		pb.Increment()
 		return nil
 	}, config.NumberThreads(), pb)
@@ -139,38 +138,12 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 	}
 	pb.Stop()
 
-	docSugsMap := docSugs.Value()
-	if len(docSugsMap) > 0 {
-		fmt.Println("\n📄 Found existing doc files for columns in the following models: ")
-		for k, v := range docSugsMap {
-			if len(v) > 10 {
-				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
-			} else {
-				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
-			}
-		}
-		fmt.Println("➖ Would you like to add docs (y/N)?")
-
-		var userPrompt string
-		fmt.Scanln(&userPrompt)
-
-		if userPrompt == "y" {
-			for file, _ := range graph.ListNodes() {
-				if _, contains := docSugsMap[file.Name]; contains {
-					ymlPath, schemaFile := generateEmptySchemaFile(file)
-					schemaModel := file.Schema
-					schemaFile.Models = properties.Models{schemaModel}
-					err = schemaFile.WriteToFile(ymlPath)
-					if err != nil {
-						fmt.Println("Error writing YML to file in path")
-						return err
-					}
-				}
-			}
-		}
+	err = userPromptDocs(graph, docSugs.Value())
+	if err != nil {
+		return err
 	}
-	return nil
 
+	return nil
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
@@ -310,6 +283,39 @@ func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
 		}
 	}
 	return file.Schema.Name, modelSuggestions
+}
+
+func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
+	if len(docSugsMap) > 0 {
+		fmt.Println("\n📄 Found existing doc files for columns in the following models: ")
+		for k, v := range docSugsMap {
+			if len(v) > 10 {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
+			} else {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
+			}
+		}
+		fmt.Println("❔ Would you like to add docs strings to descriptions (y/N)?")
+
+		var userPrompt string
+		fmt.Scanln(&userPrompt)
+
+		if userPrompt == "y" {
+			for file, _ := range graph.ListNodes() {
+				if _, contains := docSugsMap[file.Name]; contains {
+					ymlPath, schemaFile := generateEmptySchemaFile(file)
+					schemaModel := file.Schema
+					schemaFile.Models = properties.Models{schemaModel}
+					err := schemaFile.WriteToFile(ymlPath)
+					if err != nil {
+						fmt.Println("Error writing YML to file in path")
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func contains(s []string, str string) bool {
