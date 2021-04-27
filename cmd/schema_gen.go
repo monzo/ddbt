@@ -138,31 +138,35 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 		return err
 	}
 	pb.Stop()
-	fmt.Println("➖ Found existing docs for columns in the following models: ")
+
 	docSugsMap := docSugs.Value()
-	for k, v := range docSugsMap {
-		fmt.Println("\nModel:", k, "\nSuggestions:", v)
-	}
+	if len(docSugsMap) > 0 {
+		fmt.Println("\n📄 Found existing doc files for columns in the following models: ")
 
-	fmt.Println("➖ Would you like to add docs (y/N)?")
-	var userPrompt string
-	fmt.Scanln(&userPrompt)
+		for k, v := range docSugsMap {
+			if len(v) > 10 {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
+			} else {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
+			}
+		}
 
-	//files := graph.ListNodes()
+		fmt.Println("➖ Would you like to add docs (y/N)?")
 
-	if userPrompt == "y" {
-		for file, node := range graph.ListNodes() {
-			fmt.Println(node)
-			if _, contains := docSugsMap[file.Name]; contains {
-				ymlPath, schemaFile := generateEmptySchemaFile(file)
-				var schemaModel *properties.Model
-				//fmt.Println(file.Schema)
-				schemaModel = file.Schema
-				schemaFile.Models = properties.Models{schemaModel}
-				err = schemaFile.WriteToFile(ymlPath)
-				if err != nil {
-					fmt.Println("Error writing YML to file in path")
-					return err
+		var userPrompt string
+		fmt.Scanln(&userPrompt)
+
+		if userPrompt == "y" {
+			for file, _ := range graph.ListNodes() {
+				if _, contains := docSugsMap[file.Name]; contains {
+					ymlPath, schemaFile := generateEmptySchemaFile(file)
+					schemaModel := file.Schema
+					schemaFile.Models = properties.Models{schemaModel}
+					err = schemaFile.WriteToFile(ymlPath)
+					if err != nil {
+						fmt.Println("Error writing YML to file in path")
+						return err
+					}
 				}
 			}
 		}
@@ -298,24 +302,17 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
 	var modelSuggestions []string
 
-	for _, col := range file.Schema.Columns {
+	for ind, col := range file.Schema.Columns {
 		if col.Description == "" {
 			if contains(allDocFiles, col.Name) {
-				col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
+				// update column description on file pointer
+				file.Schema.Columns[ind].Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
 				modelSuggestions = append(modelSuggestions, col.Name)
 			}
 		}
 	}
 	return file.Schema.Name, modelSuggestions
 }
-
-//func addSuggestedDocs(schemaModel *properties.Model, docSuggestions []string) {
-//	for _, col := range schemaModel.Columns {
-//		if contains(docSuggestions, col.Name) {
-//			col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
-//		}
-//	}
-//}
 
 func contains(s []string, str string) bool {
 	for _, v := range s {
