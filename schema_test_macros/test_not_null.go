@@ -1,4 +1,4 @@
-package schemaTestMacro
+package schemaTestMacros
 
 func Test_not_null_macro() string {
 	return `select count(*) 
