@@ -52,7 +52,7 @@ var schemaGenCmd = &cobra.Command{
 		}
 
 		// refresh the graph state for doc suggestions
-		fmt.Println("\n👯‍♂️ Re-generating graph for doc string suggestions")
+		fmt.Println("\n🌀 Re-generating graph for doc string suggestions")
 		//fileSystem, _ = compileAllModels()
 		graph = buildGraph(fileSystem, ModelFilters)
 
@@ -295,7 +295,7 @@ func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
 				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
 			}
 		}
-		fmt.Println("❔ Would you like to add docs strings to descriptions (y/N)?")
+		fmt.Println("\n❔Would you like to add docs strings to descriptions (y/N)?")
 
 		var userPrompt string
 		fmt.Scanln(&userPrompt)
@@ -314,6 +314,7 @@ func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
 				}
 			}
 		}
+		fmt.Println("✅ Docs added to schema files")
 	}
 	return nil
 }
