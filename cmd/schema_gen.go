@@ -313,8 +313,8 @@ func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
 					}
 				}
 			}
+			fmt.Println("✅ Docs added to schema files")
 		}
-		fmt.Println("✅ Docs added to schema files")
 	}
 	return nil
 }
