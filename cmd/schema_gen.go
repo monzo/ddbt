@@ -53,6 +53,7 @@ var schemaGenCmd = &cobra.Command{
 
 		// refresh the graph state for doc suggestions
 		fmt.Println("\n👯‍♂️ Re-generating graph for doc string suggestions")
+		//fileSystem, _ = compileAllModels()
 		graph = buildGraph(fileSystem, ModelFilters)
 
 		if err := suggestDocsForGraph(graph); err != nil {
@@ -125,7 +126,9 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 	err := graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
 			modelName, modelSuggestions := suggestDocs(file, allDocs)
-			docSugs.AppendSuggestion(modelName, modelSuggestions)
+			if len(modelSuggestions) > 0 {
+				docSugs.AppendSuggestion(modelName, modelSuggestions)
+			}
 		}
 
 		pb.Increment()
@@ -135,26 +138,37 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 		return err
 	}
 	pb.Stop()
-
-	for k, v := range docSugs.Value() {
+	fmt.Println("➖ Found existing docs for columns in the following models: ")
+	docSugsMap := docSugs.Value()
+	for k, v := range docSugsMap {
 		fmt.Println("\nModel:", k, "\nSuggestions:", v)
 	}
 
-	fmt.Println(len(docSugs.Value()))
+	fmt.Println("➖ Would you like to add docs (y/N)?")
+	var userPrompt string
+	fmt.Scanln(&userPrompt)
 
+	//files := graph.ListNodes()
+
+	if userPrompt == "y" {
+		for file, node := range graph.ListNodes() {
+			fmt.Println(node)
+			if _, contains := docSugsMap[file.Name]; contains {
+				ymlPath, schemaFile := generateEmptySchemaFile(file)
+				var schemaModel *properties.Model
+				//fmt.Println(file.Schema)
+				schemaModel = file.Schema
+				schemaFile.Models = properties.Models{schemaModel}
+				err = schemaFile.WriteToFile(ymlPath)
+				if err != nil {
+					fmt.Println("Error writing YML to file in path")
+					return err
+				}
+			}
+		}
+	}
 	return nil
-	// fmt.Println("➖ Found existing docs for columns")
-	// fmt.Println("➖ Would you like to add docs (y/N)?")
-	// var userPrompt string
-	// fmt.Scanln(&userPrompt)
 
-	// if userPrompt == "y" {
-	// 	err = schemaFile.WriteToFile(ymlPath)
-	// 	if err != nil {
-	// 		fmt.Println("Error writing YML to file in path")
-	// 		return err
-	// 	}
-	// }
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
@@ -283,9 +297,8 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 
 func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
 	var modelSuggestions []string
-	schemaModel := file.Schema
 
-	for _, col := range schemaModel.Columns {
+	for _, col := range file.Schema.Columns {
 		if col.Description == "" {
 			if contains(allDocFiles, col.Name) {
 				col.Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
@@ -293,17 +306,7 @@ func suggestDocs(file *fs.File, allDocFiles []string) (string, []string) {
 			}
 		}
 	}
-
-	return schemaModel.Name, modelSuggestions
-
-	//fmt.Println("➖ Found existing docs for columns:", docSuggestions)
-	//fmt.Println("➖ Would you like to add docs for these columns (y/N)?")
-	//var userPrompt string
-	//fmt.Scanln(&userPrompt)
-	//
-	//if userPrompt == "y" {
-	//	addSuggestedDocs(schemaModel, docSuggestions)
-	//}
+	return file.Schema.Name, modelSuggestions
 }
 
 //func addSuggestedDocs(schemaModel *properties.Model, docSuggestions []string) {

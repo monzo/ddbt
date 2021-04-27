@@ -3,6 +3,7 @@ package fs
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"sync"
 
 	"ddbt/utils"
@@ -429,6 +430,10 @@ func (n *Node) queueForRun(c chan *Node) {
 
 	n.queuedToRun = true
 	c <- n
+}
+
+func (n *Node) getNodeFile() *fs.File {
+	return n.file
 }
 
 func (n *Node) markNodeAsRun(c chan *Node) {
