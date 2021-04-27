@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"io/ioutil"
 	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
+
+	"github.com/spf13/cobra"
+
+	schemaTestMacro "ddbt/schema_test_macros"
 )
 
 // Predefined tests we want to check for:
@@ -24,7 +23,7 @@ func init() {
 	addModelsFlag(testGenCmd)
 }
 
-type schemaTestMacro struct {
+type TestMacro struct {
 	Name     string
 	Filepath string
 	Contents string
@@ -50,10 +49,12 @@ var testGenCmd = &cobra.Command{
 		}
 
 		// Build a graph from the given filter.
-		fileSystem, _ := compileAllModels()
+		// fileSystem, _ := compileAllModels()
 
-		graph := buildGraph(fileSystem, ModelFilters)
+		// graph := buildGraph(fileSystem, ModelFilters)
 
+		not_null := schemaTestMacro.Test_not_null_macro()
+		fmt.Println(not_null)
 		// User prompt to make sure full table has been run in dev
 		// Read table (using similar methods from schema-gen)
 		// Apply test file to each column in BQ table -> evaluate result
@@ -65,42 +66,55 @@ var testGenCmd = &cobra.Command{
 	},
 }
 
-// Read SQL file in as string
-func readSchemaTestMacros() []schemaTestMacro {
-	var files []schemaTestMacro
-	err := filepath.Walk("../schema_test_macros", func(filePath string, info os.FileInfo, err error) error {
-		fileContents, _ := ioutil.ReadFile(filePath)
-		sqlMacro := string(fileContents)
+// // Read SQL file in as string
+// func readSchemaTestMacros() {
 
-		splitPath := strings.Split(filePath, "/")
-		fileName := splitPath[len(splitPath)-1]
+// 	err := filepath.Walk(".",
+// 		func(path string, info os.FileInfo, err error) error {
+// 			if err != nil {
+// 				return err
+// 			}
+// 			fmt.Println(path, info.Size())
+// 			return nil
+// 		})
+// 	if err != nil {
+// 		log.Println(err)
+// 	}
 
-		name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+// 	// var files []schemaTestMacro
+// 	// _ = filepath.Walk("../schema_test_macros", func(filePath string, info os.FileInfo, err error) error {
+// 	// 	fileContents, _ := ioutil.ReadFile(filePath)
+// 	// 	sqlMacro := string(fileContents)
 
-		files = append(files, schemaTestMacro{
-			Name:     name,
-			Filepath: filePath,
-			Contents: sqlMacro,
-		})
-		return nil
-	},
-	)
-	return files
-}
+// 	// 	splitPath := strings.Split(filePath, "/")
+// 	// 	fileName := splitPath[len(splitPath)-1]
 
-func readSqlFile(filePath string, macrosMap map[string]schemaTestMacro) map[string]schemaTestMacro {
-	fileContents, _ := ioutil.ReadFile(filePath)
-	sqlMacro := string(fileContents)
+// 	// 	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
-	splitPath := strings.Split(filePath, "/")
-	fileName := splitPath[len(splitPath)-1]
+// 	// 	files = append(files, schemaTestMacro{
+// 	// 		Name:     name,
+// 	// 		Filepath: filePath,
+// 	// 		Contents: sqlMacro,
+// 	// 	})
+// 	// 	return nil
+// 	// },
+// 	// )
+// 	// return files
+// }
 
-	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+// func readSqlFile(filePath string, macrosMap map[string]schemaTestMacro) map[string]schemaTestMacro {
+// 	fileContents, _ := ioutil.ReadFile(filePath)
+// 	sqlMacro := string(fileContents)
 
-	macrosMap[fileName] = schemaTestMacro{
-		Name:     name,
-		Filepath: filePath,
-		Contents: sqlMacro,
-	}
-	return macrosMap
-}
+// 	splitPath := strings.Split(filePath, "/")
+// 	fileName := splitPath[len(splitPath)-1]
+
+// 	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+// 	macrosMap[fileName] = schemaTestMacro{
+// 		Name:     name,
+// 		Filepath: filePath,
+// 		Contents: sqlMacro,
+// 	}
+// 	return macrosMap
+// }
