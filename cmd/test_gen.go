@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"context"
+	"ddbt/bigquery"
+	"ddbt/config"
+	"ddbt/fs"
+	schemaTestMacros "ddbt/schemaTestMacros"
+	"ddbt/utils"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-
-	schemaTestMacro "ddbt/schema_test_macros"
 )
 
 // Predefined tests we want to check for:
@@ -49,12 +53,20 @@ var testGenCmd = &cobra.Command{
 		}
 
 		// Build a graph from the given filter.
-		// fileSystem, _ := compileAllModels()
+		fileSystem, _ := compileAllModels()
+		graph := buildGraph(fileSystem, ModelFilters)
 
-		// graph := buildGraph(fileSystem, ModelFilters)
+		// Generate schema for every file in the graph concurrently.
+		if err := generateTestsForModelsGraph(graph); err != nil {
+			fmt.Printf("❌ %s\n", err)
+			os.Exit(1)
+		}
 
-		not_null := schemaTestMacro.Test_not_null_macro()
-		fmt.Println(not_null)
+		// not_null := schemaTestMacro.Test_not_null_macro("agents", "test")
+		// fmt.Println(not_null)
+		// unique := schemaTestMacro.Test_unique_macro("agents", "test")
+		// fmt.Println(unique)
+
 		// User prompt to make sure full table has been run in dev
 		// Read table (using similar methods from schema-gen)
 		// Apply test file to each column in BQ table -> evaluate result
@@ -66,55 +78,99 @@ var testGenCmd = &cobra.Command{
 	},
 }
 
-// // Read SQL file in as string
-// func readSchemaTestMacros() {
+func generateTestsForModelsGraph(graph *fs.Graph) error {
+	pb := utils.NewProgressBar("🖨️ Generating tests for models in graph", graph.Len())
+	defer pb.Stop()
 
-// 	err := filepath.Walk(".",
-// 		func(path string, info os.FileInfo, err error) error {
-// 			if err != nil {
-// 				return err
-// 			}
-// 			fmt.Println(path, info.Size())
-// 			return nil
-// 		})
-// 	if err != nil {
-// 		log.Println(err)
-// 	}
+	ctx, cancel := context.WithCancel(context.Background())
 
-// 	// var files []schemaTestMacro
-// 	// _ = filepath.Walk("../schema_test_macros", func(filePath string, info os.FileInfo, err error) error {
-// 	// 	fileContents, _ := ioutil.ReadFile(filePath)
-// 	// 	sqlMacro := string(fileContents)
+	return graph.Execute(func(file *fs.File) error {
+		if file.Type == fs.ModelFile {
+			if err := generateTestsForModel(ctx, file); err != nil {
+				pb.Stop()
 
-// 	// 	splitPath := strings.Split(filePath, "/")
-// 	// 	fileName := splitPath[len(splitPath)-1]
+				if err != context.Canceled {
+					fmt.Printf("❌ %s\n", err)
+				}
 
-// 	// 	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+				cancel()
+				return err
+			}
+		}
 
-// 	// 	files = append(files, schemaTestMacro{
-// 	// 		Name:     name,
-// 	// 		Filepath: filePath,
-// 	// 		Contents: sqlMacro,
-// 	// 	})
-// 	// 	return nil
-// 	// },
-// 	// )
-// 	// return files
-// }
+		// pb.Increment()
+		return nil
+	}, config.NumberThreads(), pb)
 
-// func readSqlFile(filePath string, macrosMap map[string]schemaTestMacro) map[string]schemaTestMacro {
-// 	fileContents, _ := ioutil.ReadFile(filePath)
-// 	sqlMacro := string(fileContents)
+}
 
-// 	splitPath := strings.Split(filePath, "/")
-// 	fileName := splitPath[len(splitPath)-1]
+// generateTestsForModel generates tests for model and writes yml schema for modelName.
+func generateTestsForModel(ctx context.Context, model *fs.File) error {
+	target, err := model.GetTarget()
+	if err != nil {
+		fmt.Println("could not get target for schema")
+		return err
+	}
+	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
-// 	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+	// retrieve columns from BigQuery
+	bqColumns, err := getColumnsForModel(ctx, model.Name, target)
+	if err != nil {
+		fmt.Println("Could not retrieve schema")
+		return err
+	}
+	fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
 
-// 	macrosMap[fileName] = schemaTestMacro{
-// 		Name:     name,
-// 		Filepath: filePath,
-// 		Contents: sqlMacro,
-// 	}
-// 	return macrosMap
-// }
+	// iterate through functions which return test sql and definition
+	testFuncs := []func(string, string, string, string) (string, string){
+		schemaTestMacros.Test_not_null_macro,
+		schemaTestMacros.Test_unique_macro,
+	}
+
+	testColumnQueries := make(map[string]interface{})
+	for _, col := range bqColumns {
+		testsQueries := make(map[string]string)
+		for _, test := range testFuncs {
+			testQuery, testName := test(target.ProjectID, target.DataSet, model.Name, col)
+			testsQueries[testName] = testQuery
+		}
+		testColumnQueries[col] = testsQueries
+	}
+
+	query := `select count(*) 
+	from monzo-analytics-dev.dbt_robknight_dev.support_identity_verification where support_idv_id is null`
+
+	result, err := bigquery.RunQuery(ctx, model.Name, query, target)
+	if err != nil {
+		return err
+	}
+	fmt.Println("results:", result)
+
+	return nil
+
+	// // create schema file
+	// ymlPath, schemaFile := generateEmptySchemaFile(model)
+	// var schemaModel *properties.Model
+
+	// if model.Schema == nil {
+	// 	fmt.Println("\n🔍 " + model.Name + " schema file not found.. 🌱 Generating new schema file")
+	// 	schemaModel = generateNewSchemaModel(model.Name, bqColumns)
+	// } else {
+	// 	fmt.Println("\n🔍 " + model.Name + " schema file found.. 🛠  Updating schema file")
+	// 	// set working schema model to current schema model
+	// 	schemaModel = model.Schema
+	// 	// add and remove columns in-place
+	// 	addMissingColumnsToSchema(schemaModel, bqColumns)
+	// 	removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
+	// }
+
+	// schemaFile.Models = properties.Models{schemaModel}
+	// err = schemaFile.WriteToFile(ymlPath)
+	// if err != nil {
+	// 	fmt.Println("Error writing YML to file in path")
+	// 	return err
+	// }
+	// fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
+
+	// return nil
+}
