@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/spf13/cobra"
 )
@@ -28,10 +29,28 @@ func init() {
 	addModelsFlag(testGenCmd)
 }
 
-type TestMacro struct {
-	Name     string
-	Filepath string
-	Contents string
+type TestSuggestions struct {
+	mu          sync.Mutex
+	suggestions map[string]map[string][]string
+}
+
+func (d *TestSuggestions) SetSuggestion(modelName string, testSuggestions map[string][]string) {
+	d.mu.Lock()
+	d.suggestions[modelName] = testSuggestions
+	d.mu.Unlock()
+}
+
+func (d *TestSuggestions) Init() {
+	d.mu.Lock()
+	d.suggestions = make(map[string]map[string][]string)
+	d.mu.Unlock()
+}
+
+func (d *TestSuggestions) Value() (suggestions map[string]map[string][]string) {
+	d.mu.Lock()
+	suggestions = d.suggestions
+	d.mu.Unlock()
+	return
 }
 
 type schemaTest struct {
@@ -86,36 +105,43 @@ var testGenCmd = &cobra.Command{
 
 func generateTestsForModelsGraph(graph *fs.Graph) error {
 	pb := utils.NewProgressBar("🖨️ Generating tests for models in graph", graph.Len())
-	pb.Stop()
+	defer pb.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	var testSugs TestSuggestions
+	testSugs.Init()
 
-	return graph.Execute(func(file *fs.File) error {
+	err := graph.Execute(func(file *fs.File) error {
 		if file.Type == fs.ModelFile {
-			if err := generateTestsForModel(ctx, file); err != nil {
+			testSuggestions, err := generateTestsForModel(ctx, file)
+			if err != nil {
 				pb.Stop()
-
 				if err != context.Canceled {
 					fmt.Printf("❌ %s\n", err)
 				}
-
 				cancel()
 				return err
 			}
+			testSugs.SetSuggestion(file.Name, testSuggestions)
 		}
 
-		// pb.Increment()
+		pb.Increment()
 		return nil
 	}, config.NumberThreads(), pb)
 
+	if err != nil {
+		return err
+	}
+	fmt.Println(testSugs)
+	return nil
 }
 
 // generateTestsForModel generates tests for model and writes yml schema for modelName.
-func generateTestsForModel(ctx context.Context, model *fs.File) error {
+func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]string, error) {
 	target, err := model.GetTarget()
 	if err != nil {
 		fmt.Println("could not get target for schema")
-		return err
+		return nil, err
 	}
 	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
@@ -123,7 +149,7 @@ func generateTestsForModel(ctx context.Context, model *fs.File) error {
 	bqColumns, err := getColumnsForModel(ctx, model.Name, target)
 	if err != nil {
 		fmt.Println("Could not retrieve schema")
-		return err
+		return nil, err
 	}
 	fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
 
@@ -133,26 +159,25 @@ func generateTestsForModel(ctx context.Context, model *fs.File) error {
 		schemaTestMacros.Test_unique_macro,
 	}
 
-	testColumnQueries := make(map[string]map[string]schemaTest)
+	allTestQueries := make(map[string]map[string]string)
+
 	for _, col := range bqColumns {
-		testsQueries := make(map[string]schemaTest)
+		testsQueries := make(map[string]string)
 		for _, test := range testFuncs {
 			testQuery, testName := test(target.ProjectID, target.DataSet, model.Name, col)
-			testsQueries[testName] = schemaTest{
-				Query:       testQuery,
-				QueryResult: false,
-			}
+			testsQueries[testName] = testQuery
 		}
-		testColumnQueries[col] = testsQueries
+		allTestQueries[col] = testsQueries
 	}
 
-	for col, tests := range testColumnQueries {
+	passedTestQueries := make(map[string][]string)
+
+	for col, tests := range allTestQueries {
 		for test, testQuery := range tests {
 
 			var rows uint64
-
 			var results [][]bigquery.Value
-			results, _, err = bigquery.GetRows(ctx, testQuery.Query, target)
+			results, _, err = bigquery.GetRows(ctx, testQuery, target)
 
 			if err == nil {
 				if len(results) != 1 {
@@ -164,18 +189,17 @@ func generateTestsForModel(ctx context.Context, model *fs.File) error {
 				}
 			}
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if rows == 0 {
-				testColumnQueries[col][test] = schemaTest{
-					Query:       testQuery.Query,
-					QueryResult: true,
+				if _, contains := passedTestQueries[col]; contains {
+					passedTestQueries[col] = append(passedTestQueries[col], test)
+				} else {
+					passedTestQueries[col] = []string{test}
 				}
 			}
 		}
-		fmt.Println(testColumnQueries)
-
 	}
-	return nil
+	return passedTestQueries, nil
 }
