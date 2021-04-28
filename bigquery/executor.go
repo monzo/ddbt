@@ -123,6 +123,27 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 	return query, nil
 }
 
+type ResultRow struct {
+	Count       int64 `bigquery:"count"`
+}
+
+func ExtractBigqueryResult(iter *bigquery.RowIterator) ([][]interface{}, error) {
+	var result [][]bigquery.Value
+	for {
+		var values []bigquery.Value
+		err := iter.Next(&values)
+
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, values)
+	}
+	return result, nil
+}
+
 func RunQuery(ctx context.Context, modelName string, query string, target *config.Target) (string, error) {
 
 	switch {

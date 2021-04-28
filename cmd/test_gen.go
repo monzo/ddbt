@@ -8,9 +8,9 @@ import (
 	schemaTestMacros "ddbt/schemaTestMacros"
 	"ddbt/utils"
 	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
+	"strconv"
 )
 
 // Predefined tests we want to check for:
@@ -31,6 +31,11 @@ type TestMacro struct {
 	Name     string
 	Filepath string
 	Contents string
+}
+
+type schemaTest struct {
+	Query       string
+	QueryResult bool
 }
 
 var testGenCmd = &cobra.Command{
@@ -80,7 +85,7 @@ var testGenCmd = &cobra.Command{
 
 func generateTestsForModelsGraph(graph *fs.Graph) error {
 	pb := utils.NewProgressBar("🖨️ Generating tests for models in graph", graph.Len())
-	defer pb.Stop()
+	pb.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -127,24 +132,60 @@ func generateTestsForModel(ctx context.Context, model *fs.File) error {
 		schemaTestMacros.Test_unique_macro,
 	}
 
-	testColumnQueries := make(map[string]interface{})
+	testColumnQueries := make(map[string]map[string]schemaTest)
 	for _, col := range bqColumns {
-		testsQueries := make(map[string]string)
+		testsQueries := make(map[string]schemaTest)
 		for _, test := range testFuncs {
 			testQuery, testName := test(target.ProjectID, target.DataSet, model.Name, col)
-			testsQueries[testName] = testQuery
+			testsQueries[testName] = schemaTest{
+				Query:       testQuery,
+				QueryResult: false,
+			}
 		}
 		testColumnQueries[col] = testsQueries
 	}
 
-	query := `select count(*) 
-	from monzo-analytics-dev.dbt_robknight_dev.support_identity_verification where support_idv_id is null`
-
-	result, err := bigquery.RunQuery(ctx, model.Name, query, target)
+	client, err := bigquery.GetClientFor(target.ProjectID)
 	if err != nil {
 		return err
 	}
-	fmt.Println("results:", result)
+
+	//query := `select count(*)
+	//from monzo-analytics-dev.dbt_ibrahimfaruqi_dev.support_identity_verification where support_idv_id is null`
+
+	for col, tests := range testColumnQueries {
+		for test, testQuery := range tests {
+			q := client.Query(testQuery.Query)
+			result, err := q.Read(ctx)
+			if err != nil {
+				return err
+			}
+
+			r, err := bigquery.ExtractBigqueryResult(result)
+			if err != nil {
+				return err
+			}
+
+			res := r[0][0]
+
+			queryResult := int(res)
+			if queryResult == 0 {
+				fmt.Printf("Column %s is %s\n", col, test)
+				testColumnQueries[col][test] = schemaTest{
+					Query:       testQuery.Query,
+					QueryResult: true,
+				}
+
+			}
+		}
+	}
+
+
+	//result, err := bigquery.RunQuery(ctx, model.Name, query, target)
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Println("results:", result)
 
 	return nil
 
