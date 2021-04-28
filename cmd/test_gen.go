@@ -7,10 +7,11 @@ import (
 	"ddbt/fs"
 	schemaTestMacros "ddbt/schemaTestMacros"
 	"ddbt/utils"
+	"errors"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
-	"strconv"
+
+	"github.com/spf13/cobra"
 )
 
 // Predefined tests we want to check for:
@@ -145,73 +146,36 @@ func generateTestsForModel(ctx context.Context, model *fs.File) error {
 		testColumnQueries[col] = testsQueries
 	}
 
-	client, err := bigquery.GetClientFor(target.ProjectID)
-	if err != nil {
-		return err
-	}
-
-	//query := `select count(*)
-	//from monzo-analytics-dev.dbt_ibrahimfaruqi_dev.support_identity_verification where support_idv_id is null`
-
 	for col, tests := range testColumnQueries {
 		for test, testQuery := range tests {
-			q := client.Query(testQuery.Query)
-			result, err := q.Read(ctx)
+
+			var rows uint64
+
+			var results [][]bigquery.Value
+			results, _, err = bigquery.GetRows(ctx, testQuery.Query, target)
+
+			if err == nil {
+				if len(results) != 1 {
+					err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+				} else if len(results[0]) != 1 {
+					err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+				} else {
+					rows, err = bigquery.ValueAsUint64(results[0][0])
+				}
+			}
 			if err != nil {
 				return err
 			}
 
-			r, err := bigquery.ExtractBigqueryResult(result)
-			if err != nil {
-				return err
-			}
-
-			res := r[0][0]
-
-			queryResult := int(res)
-			if queryResult == 0 {
-				fmt.Printf("Column %s is %s\n", col, test)
+			if rows == 0 {
 				testColumnQueries[col][test] = schemaTest{
 					Query:       testQuery.Query,
 					QueryResult: true,
 				}
-
 			}
 		}
+		fmt.Println(testColumnQueries)
+
 	}
-
-
-	//result, err := bigquery.RunQuery(ctx, model.Name, query, target)
-	//if err != nil {
-	//	return err
-	//}
-	//fmt.Println("results:", result)
-
 	return nil
-
-	// // create schema file
-	// ymlPath, schemaFile := generateEmptySchemaFile(model)
-	// var schemaModel *properties.Model
-
-	// if model.Schema == nil {
-	// 	fmt.Println("\n🔍 " + model.Name + " schema file not found.. 🌱 Generating new schema file")
-	// 	schemaModel = generateNewSchemaModel(model.Name, bqColumns)
-	// } else {
-	// 	fmt.Println("\n🔍 " + model.Name + " schema file found.. 🛠  Updating schema file")
-	// 	// set working schema model to current schema model
-	// 	schemaModel = model.Schema
-	// 	// add and remove columns in-place
-	// 	addMissingColumnsToSchema(schemaModel, bqColumns)
-	// 	removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
-	// }
-
-	// schemaFile.Models = properties.Models{schemaModel}
-	// err = schemaFile.WriteToFile(ymlPath)
-	// if err != nil {
-	// 	fmt.Println("Error writing YML to file in path")
-	// 	return err
-	// }
-	// fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
-
-	// return nil
 }
