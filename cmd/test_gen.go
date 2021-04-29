@@ -5,6 +5,7 @@ import (
 	"ddbt/bigquery"
 	"ddbt/config"
 	"ddbt/fs"
+	"ddbt/properties"
 	schemaTestMacros "ddbt/schemaTestMacros"
 	"ddbt/utils"
 	"errors"
@@ -88,17 +89,6 @@ var testGenCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// not_null := schemaTestMacro.Test_not_null_macro("agents", "test")
-		// fmt.Println(not_null)
-		// unique := schemaTestMacro.Test_unique_macro("agents", "test")
-		// fmt.Println(unique)
-
-		// User prompt to make sure full table has been run in dev
-		// Read table (using similar methods from schema-gen)
-		// Apply test file to each column in BQ table -> evaluate result
-		// Where test passes, suggest test (user prompt)
-		// Write the test to the schema
-
 		os.Exit(1)
 
 	},
@@ -143,8 +133,8 @@ func generateTestsForModelsGraph(graph *fs.Graph) error {
 }
 
 // generateTestsForModel generates tests for model and writes yml schema for modelName.
-func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]string, error) {
-	target, err := model.GetTarget()
+func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]string, error) {
+	target, err := file.GetTarget()
 	if err != nil {
 		fmt.Println("could not get target for schema")
 		return nil, err
@@ -152,7 +142,7 @@ func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]st
 	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
 	// retrieve columns from BigQuery
-	bqColumns, err := getColumnsForModel(ctx, model.Name, target)
+	bqColumns, err := getColumnsForModel(ctx, file.Name, target)
 	if err != nil {
 		fmt.Println("Could not retrieve schema")
 		return nil, err
@@ -170,7 +160,7 @@ func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]st
 	for _, col := range bqColumns {
 		testsQueries := make(map[string]string)
 		for _, test := range testFuncs {
-			testQuery, testName := test(target.ProjectID, target.DataSet, model.Name, col)
+			testQuery, testName := test(target.ProjectID, target.DataSet, file.Name, col)
 			testsQueries[testName] = testQuery
 		}
 		allTestQueries[col] = testsQueries
@@ -207,21 +197,35 @@ func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]st
 			}
 		}
 	}
+	updateSchemaFile(passedTestQueries, file)
+
 	return passedTestQueries, nil
 }
 
-func updateSchemaFile(passedTestQueries map[string][]string, model *fs.File) error {
-	for _, column := range model.Schema.Columns {
+func updateSchemaFile(passedTestQueries map[string][]string, model *fs.File) {
+	updatedColumns := model.Schema.Columns
+	for colIndex, column := range model.Schema.Columns {
 		if _, exists := passedTestQueries[column.Name]; exists {
+
+			// search for test in existing tests
 			for _, test := range passedTestQueries[column.Name] {
+				testFound := false
 				for _, existingTest := range column.Tests {
-					if existingTest.Name != test {
-						
+					if existingTest.Name == test {
+						testFound = true
+						break
 					}
+				}
+				if !testFound {
+					column.Tests = append(column.Tests, &properties.Test{
+						Name: test,
+					})
 				}
 			}
 		}
+		updatedColumns[colIndex] = column
 	}
+	model.Schema.Columns = updatedColumns
 }
 
 func userPromptTests(graph *fs.Graph, testSugsMap map[string]map[string][]string) error {
@@ -234,32 +238,27 @@ func userPromptTests(graph *fs.Graph, testSugsMap map[string]map[string][]string
 				testPrint := strings.Join(tests[:], "\n  - ")
 				fmt.Println("  -", testPrint)
 			}
-			//if len(v) > 10 {
-			//	fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
-			//} else {
-			//	fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
-			//}
 		}
 		fmt.Println("\n❔ Would you like to add these tests to the schema (y/N)?")
 
 		var userPrompt string
 		fmt.Scanln(&userPrompt)
 
-		//if userPrompt == "y" {
-		//	for file, _ := range graph.ListNodes() {
-		//		if _, contains := docSugsMap[file.Name]; contains {
-		//			ymlPath, schemaFile := generateEmptySchemaFile(file)
-		//			schemaModel := file.Schema
-		//			schemaFile.Models = properties.Models{schemaModel}
-		//			err := schemaFile.WriteToFile(ymlPath)
-		//			if err != nil {
-		//				fmt.Println("Error writing YML to file in path")
-		//				return err
-		//			}
-		//		}
-		//	}
-		//	fmt.Println("✅ Docs added to schema files")
-		//}
+		if userPrompt == "y" {
+			for file, _ := range graph.ListNodes() {
+				if _, contains := testSugsMap[file.Name]; contains {
+					ymlPath, schemaFile := generateEmptySchemaFile(file)
+					schemaModel := file.Schema
+					schemaFile.Models = properties.Models{schemaModel}
+					err := schemaFile.WriteToFile(ymlPath)
+					if err != nil {
+						fmt.Println("Error writing YML to file in path")
+						return err
+					}
+				}
+			}
+			fmt.Println("✅ Tests added to schema files")
+		}
 	}
 	return nil
 }
