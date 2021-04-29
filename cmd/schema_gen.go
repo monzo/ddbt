@@ -146,8 +146,8 @@ func suggestDocsForGraph(graph *fs.Graph) error {
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
-func generateSchemaForModel(ctx context.Context, model *fs.File) error {
-	target, err := model.GetTarget()
+func generateSchemaForModel(ctx context.Context, file *fs.File) error {
+	target, err := file.GetTarget()
 	if err != nil {
 		fmt.Println("could not get target for schema")
 		return err
@@ -155,7 +155,7 @@ func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 	fmt.Println("\n🎯 Target for retrieving schema:", target.ProjectID+"."+target.DataSet)
 
 	// retrieve columns from BigQuery
-	bqColumns, err := getColumnsForModel(ctx, model.Name, target)
+	bqColumns, err := getColumnsForModel(ctx, file.Name, target)
 	if err != nil {
 		fmt.Println("Could not retrieve schema")
 		return err
@@ -163,16 +163,16 @@ func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 	fmt.Println("✅ BQ Schema retrieved. Number of columns in BQ table:", len(bqColumns))
 
 	// create schema file
-	ymlPath, schemaFile := generateEmptySchemaFile(model)
+	ymlPath, schemaFile := generateEmptySchemaFile(file)
 	var schemaModel *properties.Model
 
-	if model.Schema == nil {
-		fmt.Println("\n🔍 " + model.Name + " schema file not found.. 🌱 Generating new schema file")
-		schemaModel = generateNewSchemaModel(model.Name, bqColumns)
+	if file.Schema == nil {
+		fmt.Println("\n🔍 " + file.Name + " schema file not found.. 🌱 Generating new schema file")
+		schemaModel = generateNewSchemaModel(file.Name, bqColumns)
 	} else {
-		fmt.Println("\n🔍 " + model.Name + " schema file found.. 🛠  Updating schema file")
-		// set working schema model to current schema model
-		schemaModel = model.Schema
+		fmt.Println("\n🔍 " + file.Name + " schema file found.. 🛠  Updating schema file")
+		// set working schema file to current schema file
+		schemaModel = file.Schema
 		// add and remove columns in-place
 		addMissingColumnsToSchema(schemaModel, bqColumns)
 		removeOutdatedColumnsFromSchema(schemaModel, bqColumns)
@@ -184,7 +184,7 @@ func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 		fmt.Println("Error writing YML to file in path")
 		return err
 	}
-	fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
+	fmt.Println("\n✅ " + file.Name + "schema successfully updated at path: " + ymlPath)
 
 	return nil
 }
@@ -205,8 +205,8 @@ func getColumnsForModel(ctx context.Context, modelName string, target *config.Ta
 
 // generate an empty schema file which will be populated according to existing yml schemas and the bigquery schema.
 // Returns the local path for the yml file and the yml file struct
-func generateEmptySchemaFile(model *fs.File) (ymlPath string, schemaFile properties.File) {
-	ymlPath = strings.Replace(model.Path, ".sql", ".yml", 1)
+func generateEmptySchemaFile(file *fs.File) (ymlPath string, schemaFile properties.File) {
+	ymlPath = strings.Replace(file.Path, ".sql", ".yml", 1)
 	schemaFile = properties.File{}
 	schemaFile.Version = properties.FileVersion
 	return ymlPath, schemaFile

@@ -31,6 +31,12 @@ func init() {
 	addModelsFlag(testGenCmd)
 }
 
+type ColumnTestQuery struct {
+	Column    string
+	TestName  string
+	TestQuery string
+}
+
 type TestSuggestions struct {
 	mu          sync.Mutex
 	suggestions map[string]map[string][]string
@@ -53,11 +59,6 @@ func (d *TestSuggestions) Value() (suggestions map[string]map[string][]string) {
 	suggestions = d.suggestions
 	d.mu.Unlock()
 	return
-}
-
-type schemaTest struct {
-	Query       string
-	QueryResult bool
 }
 
 var testGenCmd = &cobra.Command{
@@ -96,7 +97,7 @@ var testGenCmd = &cobra.Command{
 
 func generateTestsForModelsGraph(graph *fs.Graph) error {
 	pb := utils.NewProgressBar("🖨 Generating tests for models in graph", graph.Len())
-
+	pb.Stop()
 	ctx, cancel := context.WithCancel(context.Background())
 	var testSugs TestSuggestions
 	testSugs.Init()
@@ -155,51 +156,64 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 		schemaTestMacros.Test_unique_macro,
 	}
 
-	allTestQueries := make(map[string]map[string]string)
+	var allTestQueries []ColumnTestQuery
 
 	for _, col := range bqColumns {
-		testsQueries := make(map[string]string)
 		for _, test := range testFuncs {
 			testQuery, testName := test(target.ProjectID, target.DataSet, file.Name, col)
-			testsQueries[testName] = testQuery
+			allTestQueries = append(allTestQueries, ColumnTestQuery{
+				Column:    col,
+				TestName:  testName,
+				TestQuery: testQuery,
+			})
 		}
-		allTestQueries[col] = testsQueries
 	}
+
+	ch := make(chan ColumnTestQuery, len(allTestQueries))
+
+	wg := sync.WaitGroup{}
+
+	for _, ctq := range allTestQueries {
+		wg.Add(1)
+
+		go evaluateTestQuery(ctx, target, ctq, ch, &wg)
+	}
+
+	wg.Wait()
+	close(ch)
 
 	passedTestQueries := make(map[string][]string)
-
-	for col, tests := range allTestQueries {
-		for test, testQuery := range tests {
-
-			var rows uint64
-			var results [][]bigquery.Value
-			results, _, err = bigquery.GetRows(ctx, testQuery, target)
-
-			if err == nil {
-				if len(results) != 1 {
-					err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
-				} else if len(results[0]) != 1 {
-					err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
-				} else {
-					rows, err = bigquery.ValueAsUint64(results[0][0])
-				}
-			}
-			if err != nil {
-				return nil, err
-			}
-
-			if rows == 0 {
-				if _, contains := passedTestQueries[col]; contains {
-					passedTestQueries[col] = append(passedTestQueries[col], test)
-				} else {
-					passedTestQueries[col] = []string{test}
-				}
-			}
+	for passedTestQuery := range ch {
+		if _, contains := passedTestQueries[passedTestQuery.Column]; contains {
+			passedTestQueries[passedTestQuery.Column] = append(passedTestQueries[passedTestQuery.Column], passedTestQuery.TestName)
+		} else {
+			passedTestQueries[passedTestQuery.Column] = []string{passedTestQuery.TestName}
 		}
 	}
+
 	updateSchemaFile(passedTestQueries, file)
 
 	return passedTestQueries, nil
+}
+
+func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, ch chan ColumnTestQuery, wg *sync.WaitGroup) {
+	fmt.Printf("Running query for %s test on column %s inside GO Routine", ctq.TestName, ctq.Column)
+	results, _, err := bigquery.GetRows(ctx, ctq.TestQuery, target)
+
+	if err == nil {
+		if len(results) != 1 {
+			err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+		} else if len(results[0]) != 1 {
+			err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+		} else {
+			rows, _ := bigquery.ValueAsUint64(results[0][0])
+			if rows == 0 {
+				ch <- ctq
+			}
+		}
+	}
+
+	wg.Done()
 }
 
 func updateSchemaFile(passedTestQueries map[string][]string, model *fs.File) {
