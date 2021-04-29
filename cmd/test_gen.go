@@ -75,6 +75,15 @@ var testGenCmd = &cobra.Command{
 			ModelFilters = append(ModelFilters, args[0])
 		}
 
+		fmt.Println(`ℹ️  test-gen requires models without sampling to be accurate
+❓  Have you run the provided models with sampling off? (y/N)`)
+		var userPrompt string
+		fmt.Scanln(&userPrompt)
+		if userPrompt != "y" {
+			fmt.Println("❌ Please run your model with sampling and then use test-gen")
+			os.Exit(1)
+		}
+
 		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
 		graph := buildGraph(fileSystem, ModelFilters)
