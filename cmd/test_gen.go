@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -104,8 +105,7 @@ var testGenCmd = &cobra.Command{
 }
 
 func generateTestsForModelsGraph(graph *fs.Graph) error {
-	pb := utils.NewProgressBar("🖨️ Generating tests for models in graph", graph.Len())
-	defer pb.Stop()
+	pb := utils.NewProgressBar("🖨 Generating tests for models in graph", graph.Len())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var testSugs TestSuggestions
@@ -132,7 +132,13 @@ func generateTestsForModelsGraph(graph *fs.Graph) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(testSugs)
+	pb.Stop()
+
+	err = userPromptTests(graph, testSugs.suggestions)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -202,4 +208,58 @@ func generateTestsForModel(ctx context.Context, model *fs.File) (map[string][]st
 		}
 	}
 	return passedTestQueries, nil
+}
+
+func updateSchemaFile(passedTestQueries map[string][]string, model *fs.File) error {
+	for _, column := range model.Schema.Columns {
+		if _, exists := passedTestQueries[column.Name]; exists {
+			for _, test := range passedTestQueries[column.Name] {
+				for _, existingTest := range column.Tests {
+					if existingTest.Name != test {
+						
+					}
+				}
+			}
+		}
+	}
+}
+
+func userPromptTests(graph *fs.Graph, testSugsMap map[string]map[string][]string) error {
+	if len(testSugsMap) > 0 {
+		fmt.Println("\n🧪 Valid tests found for the following models: ")
+		for model, columnTests := range testSugsMap {
+			fmt.Println("\n🧬 Model:", model)
+			for column, tests := range columnTests {
+				fmt.Println("🏛 Column:", column)
+				testPrint := strings.Join(tests[:], "\n  - ")
+				fmt.Println("  -", testPrint)
+			}
+			//if len(v) > 10 {
+			//	fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
+			//} else {
+			//	fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
+			//}
+		}
+		fmt.Println("\n❔ Would you like to add these tests to the schema (y/N)?")
+
+		var userPrompt string
+		fmt.Scanln(&userPrompt)
+
+		//if userPrompt == "y" {
+		//	for file, _ := range graph.ListNodes() {
+		//		if _, contains := docSugsMap[file.Name]; contains {
+		//			ymlPath, schemaFile := generateEmptySchemaFile(file)
+		//			schemaModel := file.Schema
+		//			schemaFile.Models = properties.Models{schemaModel}
+		//			err := schemaFile.WriteToFile(ymlPath)
+		//			if err != nil {
+		//				fmt.Println("Error writing YML to file in path")
+		//				return err
+		//			}
+		//		}
+		//	}
+		//	fmt.Println("✅ Docs added to schema files")
+		//}
+	}
+	return nil
 }
