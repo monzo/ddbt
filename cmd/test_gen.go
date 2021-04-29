@@ -16,12 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Predefined tests we want to check for:
-// - Uniquness
-// - Not null
-
 // STRETCH:
-// Parallelise running tests for each column)
+// only output suggestions to terminal for new tests
 // Parse macro files
 // Test with value inputs e.g. accepted values
 
@@ -96,7 +92,7 @@ var testGenCmd = &cobra.Command{
 
 func generateTestsForModelsGraph(graph *fs.Graph) error {
 	pb := utils.NewProgressBar("🖨 Generating tests for models in graph", graph.Len())
-	pb.Stop()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	var testSugs TestSuggestions
 	testSugs.Init()
@@ -156,7 +152,6 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 	}
 
 	var allTestQueries []ColumnTestQuery
-
 	for _, col := range bqColumns {
 		for _, test := range testFuncs {
 			testQuery, testName := test(target.ProjectID, target.DataSet, file.Name, col)
@@ -168,19 +163,46 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 		}
 	}
 
+	passedTestQueries, err := runQueriesParallel(ctx, target, allTestQueries)
+	if err != nil {
+		return nil, err
+	}
+	updateSchemaFile(passedTestQueries, file)
+
+	return passedTestQueries, nil
+}
+
+func runQueriesParallel(ctx context.Context, target *config.Target, allTestQueries []ColumnTestQuery) (map[string][]string, error) {
+	// number of parallel query runners
+	numQueryRunners := 100
+
+	queries := make(chan ColumnTestQuery)
+	go func() {
+		for _, q := range allTestQueries {
+			queries <- q
+		}
+		close(queries)
+	}()
+
 	out := make(chan ColumnTestQuery, len(allTestQueries))
 	errs := make(chan error, len(allTestQueries))
-
 	wg := sync.WaitGroup{}
 
-	for _, ctq := range allTestQueries {
+	for i := 0; i < numQueryRunners; i++ {
 		wg.Add(1)
-		go evaluateTestQuery(ctx, target, ctq, out, errs, &wg)
+		go func(i int) {
+			defer wg.Done()
+			for query := range queries {
+				evaluateTestQuery(ctx, target, query, out, errs, i)
+			}
+		}(i)
 	}
 
-	wg.Wait()
-	close(out)
-	close(errs)
+	go func() {
+		wg.Wait()
+		close(out)
+		close(errs)
+	}()
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf(fmt.Sprintf("go routines for running tests returned %v errors", len(errs)))
@@ -195,20 +217,23 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 		}
 	}
 
-	updateSchemaFile(passedTestQueries, file)
-
 	return passedTestQueries, nil
 }
 
-func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, out chan ColumnTestQuery, errs chan error, wg *sync.WaitGroup) {
+func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, out chan ColumnTestQuery, errs chan error, workerIndex int) {
 	results, _, err := bigquery.GetRows(ctx, ctq.TestQuery, target)
 
-	fmt.Printf("\nRunning query for %s test on column %s inside GO Routine", ctq.TestName, ctq.Column)
 	if err == nil {
 		if len(results) != 1 {
-			errs <- fmt.Errorf(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+			errs <- fmt.Errorf(fmt.Sprintf(
+				"a schema test should only return 1 row, got %d for %s test on column %s by worker %v",
+				len(results), ctq.TestName, ctq.Column, workerIndex),
+			)
 		} else if len(results[0]) != 1 {
-			errs <- fmt.Errorf(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+			errs <- fmt.Errorf(fmt.Sprintf(
+				"a schema test should only return 1 column, got %d for %s test on column %s by worker %v",
+				len(results), ctq.TestName, ctq.Column, workerIndex),
+			)
 		} else {
 			rows, _ := bigquery.ValueAsUint64(results[0][0])
 			if rows == 0 {
@@ -216,7 +241,7 @@ func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTes
 			}
 		}
 	}
-	wg.Done()
+
 }
 
 func updateSchemaFile(passedTestQueries map[string][]string, model *fs.File) {
