@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// STRETCH:
+// TODO:
 // only output suggestions to terminal for new tests
 // Parse macro files
 // Test with value inputs e.g. accepted values
