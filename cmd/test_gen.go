@@ -8,7 +8,6 @@ import (
 	"ddbt/properties"
 	schemaTestMacros "ddbt/schemaTestMacros"
 	"ddbt/utils"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -169,21 +168,26 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 		}
 	}
 
-	ch := make(chan ColumnTestQuery, len(allTestQueries))
+	out := make(chan ColumnTestQuery, len(allTestQueries))
+	errs := make(chan error, len(allTestQueries))
 
 	wg := sync.WaitGroup{}
 
 	for _, ctq := range allTestQueries {
 		wg.Add(1)
-
-		go evaluateTestQuery(ctx, target, ctq, ch, &wg)
+		go evaluateTestQuery(ctx, target, ctq, out, errs, &wg)
 	}
 
 	wg.Wait()
-	close(ch)
+	close(out)
+	close(errs)
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf(fmt.Sprintf("go routines for running tests returned %v errors", len(errs)))
+	}
 
 	passedTestQueries := make(map[string][]string)
-	for passedTestQuery := range ch {
+	for passedTestQuery := range out {
 		if _, contains := passedTestQueries[passedTestQuery.Column]; contains {
 			passedTestQueries[passedTestQuery.Column] = append(passedTestQueries[passedTestQuery.Column], passedTestQuery.TestName)
 		} else {
@@ -196,23 +200,22 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 	return passedTestQueries, nil
 }
 
-func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, ch chan ColumnTestQuery, wg *sync.WaitGroup) {
-	fmt.Printf("Running query for %s test on column %s inside GO Routine", ctq.TestName, ctq.Column)
+func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, out chan ColumnTestQuery, errs chan error, wg *sync.WaitGroup) {
 	results, _, err := bigquery.GetRows(ctx, ctq.TestQuery, target)
 
+	fmt.Printf("\nRunning query for %s test on column %s inside GO Routine", ctq.TestName, ctq.Column)
 	if err == nil {
 		if len(results) != 1 {
-			err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+			errs <- fmt.Errorf(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
 		} else if len(results[0]) != 1 {
-			err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+			errs <- fmt.Errorf(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
 		} else {
 			rows, _ := bigquery.ValueAsUint64(results[0][0])
 			if rows == 0 {
-				ch <- ctq
+				out <- ctq
 			}
 		}
 	}
-
 	wg.Done()
 }
 
