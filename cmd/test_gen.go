@@ -84,9 +84,7 @@ var testGenCmd = &cobra.Command{
 			fmt.Printf("❌ %s\n", err)
 			os.Exit(1)
 		}
-
 		os.Exit(1)
-
 	},
 }
 
@@ -220,7 +218,8 @@ func runQueriesParallel(ctx context.Context, target *config.Target, allTestQueri
 	return passedTestQueries, nil
 }
 
-func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, out chan ColumnTestQuery, errs chan error, workerIndex int) {
+func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTestQuery, out chan ColumnTestQuery,
+	errs chan error, workerIndex int) {
 	results, _, err := bigquery.GetRows(ctx, ctq.TestQuery, target)
 
 	if err == nil {
