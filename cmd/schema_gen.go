@@ -7,6 +7,7 @@ import (
 	"ddbt/fs"
 	"ddbt/properties"
 	"ddbt/utils"
+	"sync"
 
 	"fmt"
 	"os"
@@ -41,6 +42,7 @@ var schemaGenCmd = &cobra.Command{
 
 		// Build a graph from the given filter.
 		fileSystem, _ := compileAllModels()
+
 		graph := buildGraph(fileSystem, ModelFilters)
 
 		// Generate schema for every file in the graph concurrently.
@@ -48,6 +50,17 @@ var schemaGenCmd = &cobra.Command{
 			fmt.Printf("❌ %s\n", err)
 			os.Exit(1)
 		}
+
+		// refresh the graph state for doc suggestions
+		fmt.Println("\n🌀 Resetting graph run status for doc string suggestions")
+		graph.UnmarkGraphAsFullyRun()
+
+		if err := suggestDocsForGraph(graph); err != nil {
+			fmt.Printf("❌ %s\n", err)
+			os.Exit(1)
+		}
+		os.Exit(1)
+
 	},
 }
 
@@ -74,6 +87,62 @@ func generateSchemaForGraph(graph *fs.Graph) error {
 		pb.Increment()
 		return nil
 	}, config.NumberThreads(), pb)
+
+}
+
+type DocSuggestions struct {
+	mu          sync.Mutex
+	suggestions map[string][]string
+}
+
+func (d *DocSuggestions) AppendSuggestion(modelName string, modelSuggestions []string) {
+	d.mu.Lock()
+	d.suggestions[modelName] = modelSuggestions
+	d.mu.Unlock()
+}
+
+func (d *DocSuggestions) Init() {
+	d.mu.Lock()
+	d.suggestions = make(map[string][]string)
+	d.mu.Unlock()
+
+}
+
+func (d *DocSuggestions) Value() (suggestions map[string][]string) {
+	d.mu.Lock()
+	suggestions = d.suggestions
+	d.mu.Unlock()
+	return
+}
+
+func suggestDocsForGraph(graph *fs.Graph) error {
+	allDocs := allDocFiles()
+
+	pb := utils.NewProgressBar("🎁 Suggesting docs", graph.Len())
+
+	var docSugs DocSuggestions
+	docSugs.Init()
+	err := graph.Execute(func(file *fs.File) error {
+		if file.Type == fs.ModelFile {
+			modelName, modelSuggestions := suggestDocs(file, allDocs)
+			if len(modelSuggestions) > 0 {
+				docSugs.AppendSuggestion(modelName, modelSuggestions)
+			}
+		}
+		pb.Increment()
+		return nil
+	}, config.NumberThreads(), pb)
+	if err != nil {
+		return err
+	}
+	pb.Stop()
+
+	err = userPromptDocs(graph, docSugs.Value())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // generateSchemaForModel generates a schema and writes yml for modelName.
@@ -116,6 +185,7 @@ func generateSchemaForModel(ctx context.Context, model *fs.File) error {
 		return err
 	}
 	fmt.Println("\n✅ " + model.Name + "schema successfully updated at path: " + ymlPath)
+
 	return nil
 }
 
@@ -197,4 +267,53 @@ func removeOutdatedColumnsFromSchema(schemaModel *properties.Model, bqColumns []
 	}
 	schemaModel.Columns = columnsKept
 	fmt.Println("➖ Columns removed from Schema (no longer in BQ table):", columnsRemoved)
+}
+
+func suggestDocs(file *fs.File, allDocFiles map[string]interface{}) (string, []string) {
+	var modelSuggestions []string
+
+	for ind, col := range file.Schema.Columns {
+		if col.Description == "" {
+			if _, found := allDocFiles[col.Name]; found {
+				// update column description on file pointer
+				file.Schema.Columns[ind].Description = fmt.Sprintf("{{ doc(\"%s\") }}", col.Name)
+				modelSuggestions = append(modelSuggestions, col.Name)
+			}
+		}
+	}
+	return file.Schema.Name, modelSuggestions
+}
+
+func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
+	if len(docSugsMap) > 0 {
+		fmt.Println("\n📄 Found existing doc files for columns in the following models: ")
+		for k, v := range docSugsMap {
+			if len(v) > 10 {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", len(v), "fields")
+			} else {
+				fmt.Println("\n🧬 Model:", k, "\n↪️ Suggestions:", v)
+			}
+		}
+		fmt.Println("\n❔Would you like to add docs strings to descriptions (y/N)?")
+
+		var userPrompt string
+		fmt.Scanln(&userPrompt)
+
+		if userPrompt == "y" {
+			for file, _ := range graph.ListNodes() {
+				if _, contains := docSugsMap[file.Name]; contains {
+					ymlPath, schemaFile := generateEmptySchemaFile(file)
+					schemaModel := file.Schema
+					schemaFile.Models = properties.Models{schemaModel}
+					err := schemaFile.WriteToFile(ymlPath)
+					if err != nil {
+						fmt.Println("Error writing YML to file in path")
+						return err
+					}
+				}
+			}
+			fmt.Println("✅ Docs added to schema files")
+		}
+	}
+	return nil
 }

@@ -20,6 +20,7 @@ type FileSystem struct {
 	schemas     map[string]*SchemaFile // schema files
 	tests       map[string]*File       // Tests
 	seeds       map[string]*SeedFile   // Seed CSV files
+	Docs        map[string]*DocFile
 	testMutex   sync.Mutex
 }
 
@@ -31,6 +32,7 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		schemas:     make(map[string]*SchemaFile),
 		tests:       make(map[string]*File),
 		seeds:       make(map[string]*SeedFile),
+		Docs:        make(map[string]*DocFile),
 	}
 
 	// FIXME: disabled for a bit
@@ -54,14 +56,19 @@ func ReadFileSystem(msgWriter io.Writer) (*FileSystem, error) {
 		return nil, err
 	}
 
+	if err := fs.scanDocDirectory("./docs/"); err != nil {
+		return nil, err
+	}
+
 	fmt.Fprintf(
 		msgWriter,
-		"🔎 Found %d models, %d macros, %d tests, %d schema, %d seed files\n",
+		"🔎 Found %d models, %d macros, %d tests, %d schema, %d seed files, %d docs\n",
 		len(fs.files)-len(fs.macroLookup)-len(fs.tests),
 		len(fs.macroLookup),
 		len(fs.tests),
 		len(fs.schemas),
 		len(fs.seeds),
+		len(fs.Docs),
 	)
 
 	return fs, nil
@@ -76,6 +83,7 @@ func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 		schemas:     make(map[string]*SchemaFile),
 		tests:       make(map[string]*File),
 		seeds:       make(map[string]*SeedFile),
+		Docs:        make(map[string]*DocFile),
 	}
 
 	for filePath, contents := range models {
@@ -173,6 +181,12 @@ func (fs *FileSystem) recordSchemaFile(path string) error {
 	return nil
 }
 
+func (fs *FileSystem) recordDocFile(path string) error {
+	fs.Docs[path] = newDocFile(path)
+
+	return nil
+}
+
 // Maps macros into our lookup options
 func (fs *FileSystem) mapMacroLookupOptions(file *File) error {
 	path := strings.TrimSuffix(filepath.Base(file.Path), ".sql")
@@ -206,6 +220,32 @@ func (fs *FileSystem) scanSeedDirectory(path string) error {
 
 		if filepath.Ext(filepath.Clean(path)) == ".csv" {
 			return fs.recordSeedFile(path)
+		}
+
+		return nil
+	})
+}
+
+func (fs *FileSystem) scanDocDirectory(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			// Return early if seed directory doesn't exist.
+			return nil
+		}
+		return err
+	}
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		// If we've encountered an error walking this path, let's return now
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(filepath.Clean(path)) == ".md" {
+			return fs.recordDocFile(path)
 		}
 
 		return nil

@@ -56,16 +56,20 @@ func addFailOnNotFoundFlag(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "f", true, "Fail if given models are not found")
 }
 
-func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
-	_, _ = fmt.Fprintf(os.Stderr, "ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
-
+func readFileSystem() *fs.FileSystem {
 	// Read the models on the file system
 	fileSystem, err := fs.ReadFileSystem(os.Stderr)
 	if err != nil {
 		fmt.Printf("❌ Unable to read filesystem: %s\n", err)
 		os.Exit(1)
 	}
+	return fileSystem
+}
 
+func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
+	_, _ = fmt.Fprintf(os.Stderr, "ℹ️  Building for %s profile\n", config.GlobalCfg.Target.Name)
+
+	fileSystem := readFileSystem()
 	// Now parse and compile the whole project
 	parseSchemas(fileSystem)
 	parseFiles(fileSystem)
@@ -80,6 +84,17 @@ func compileAllModels() (*fs.FileSystem, *compiler.GlobalContext) {
 	compileTests(fileSystem, gc)
 
 	return fileSystem, gc
+}
+
+func allDocFiles() map[string]interface{} {
+	fileSystem := readFileSystem()
+
+	docFiles := make(map[string]interface{})
+	for _, doc := range fileSystem.Docs {
+		docFiles[doc.Name] = nil
+	}
+
+	return docFiles
 }
 
 func parseFiles(fileSystem *fs.FileSystem) {
