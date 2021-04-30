@@ -71,7 +71,7 @@ var testGenCmd = &cobra.Command{
 			os.Exit(1)
 		case len(args) == 1:
 			// This will actually allow something weird like
-			// ddbt schema-gen +model+
+			// ddbt test-gen +model+
 			ModelFilters = append(ModelFilters, args[0])
 		}
 
