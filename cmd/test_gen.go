@@ -154,8 +154,8 @@ func generateTestsForModel(ctx context.Context, file *fs.File) (map[string][]str
 
 	// iterate through functions which return test sql and definition
 	testFuncs := []func(string, string, string, string) (string, string){
-		schemaTestMacros.Test_not_null_macro,
-		schemaTestMacros.Test_unique_macro,
+		schemaTestMacros.TestNotNullMacro,
+		schemaTestMacros.TestUniqueMacro,
 	}
 
 	var allTestQueries []ColumnTestQuery
@@ -195,8 +195,8 @@ func runQueriesParallel(ctx context.Context, target *config.Target, allTestQueri
 	errs := make(chan error, len(allTestQueries))
 	wg := sync.WaitGroup{}
 
+	wg.Add(numQueryRunners)
 	for i := 0; i < numQueryRunners; i++ {
-		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			for query := range queries {
@@ -211,8 +211,9 @@ func runQueriesParallel(ctx context.Context, target *config.Target, allTestQueri
 		close(errs)
 	}()
 
-	if len(errs) > 0 {
-		return nil, fmt.Errorf(fmt.Sprintf("go routines for running tests returned %v errors", len(errs)))
+	if err := <-errs; err != nil {
+		// there is at least one error, but we ignore the rest
+		return nil, err
 	}
 
 	passedTestQueries := make(map[string][]string)
@@ -248,6 +249,9 @@ func evaluateTestQuery(ctx context.Context, target *config.Target, ctq ColumnTes
 				out <- ctq
 			}
 		}
+	}
+	if err != nil {
+		errs <- err
 	}
 
 }

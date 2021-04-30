@@ -2,7 +2,7 @@ package schemaTestMacros
 
 import "fmt"
 
-func Test_unique_macro(project string, dataset string, model string, column_name string) (string, string) {
+func TestUniqueMacro(project string, dataset string, model string, column_name string) (string, string) {
 	return fmt.Sprintf(`select count(*)
 	from (
 		select
