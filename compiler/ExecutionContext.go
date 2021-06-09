@@ -119,7 +119,7 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 	}
 
 	switch upstream.GetMaterialization() {
-	case "table", "incremental", "project_sharded_table":
+	case "table", "incremental", "project_sharded_table", "view":
 		// If "--upstream=target" has been provided and this model is not in the DAG, then we read from the upstream
 		// target, rather than the target defined in "--target=target"
 		if target.ReadUpstream != nil && !upstream.IsInDAG() {
