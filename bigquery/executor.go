@@ -83,17 +83,10 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 			DatasetInProject(target.ProjectID, target.DataSet).
 			Table(f.Name)
 		metadata, err := table.Metadata(ctx)
-		if err != nil {
-			return query, fmt.Errorf("Cannot get table metadata %s: %s", f.Name, err)
+		if err != nil && !isErrTableNotFound(err) {
+			return query, fmt.Errorf("Cannot get table metadata %s: %+v", f.Name, err)
 		}
-		if metadata.ViewQuery != "" {
-			// We need to update the view
-			if _, err := table.Update(ctx, bigquery.TableMetadataToUpdate{
-				ViewQuery: query,
-			}, metadata.ETag); err != nil {
-				return query, fmt.Errorf("Cannot update view metadata %s: %s", f.Name, err)
-			}
-		} else {
+		if isErrTableNotFound(err) {
 			// If the materialization is specified as a view, populate
 			// the BQ metadata that converts the table to a view.
 			if err := table.Create(ctx, &bigquery.TableMetadata{
@@ -101,6 +94,16 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 			}); err != nil {
 				return query, fmt.Errorf("Unable to create view: %s %s", f.Name, err)
 			}
+		} else if metadata.ViewQuery != "" {
+			// We need to update the view
+			if _, err := table.Update(ctx, bigquery.TableMetadataToUpdate{
+				ViewQuery: query,
+			}, metadata.ETag); err != nil {
+				return query, fmt.Errorf("Cannot update view metadata %s: %s", f.Name, err)
+			}
+		} else {
+			// Table exists and doesn't have a view query
+			return query, fmt.Errorf("Existing table is not a view %s: %s", f.Name, err)
 		}
 	} else {
 		q := client.Query(query)
@@ -404,4 +407,11 @@ func getSeedSchema(seed *fs.SeedFile) (bigquery.Schema, error) {
 		})
 	}
 	return schema, nil
+}
+
+func isErrTableNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.HasPrefix(err.Error(), "googleapi: Error 404: Not found")
 }
