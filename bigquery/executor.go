@@ -77,47 +77,74 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 
 	dataset := client.DatasetInProject(target.ProjectID, target.DataSet)
 
-	q := client.Query(query)
-	q.Location = target.Location
-
-	// Default read information
-	q.DefaultProjectID = target.ProjectID
-	q.DefaultDatasetID = target.DataSet
-	q.DisableQueryCache = true
-
-	// Output write information
-	q.Dst = dataset.Table(f.Name)
-	q.CreateDisposition = bigquery.CreateIfNeeded
-	q.WriteDisposition = bigquery.WriteTruncate
-
-	job, err := q.Run(ctx)
-	if err != nil {
-		if err == context.Canceled {
-			return "", err
+	if f.IsView {
+		// Try to see if view exists.
+		table := client.
+			DatasetInProject(target.ProjectID, target.DataSet).
+			Table(f.Name)
+		metadata, err := table.Metadata(ctx)
+		if err != nil {
+			return query, fmt.Errorf("Cannot get table metadata %s: %s", f.Name, err)
 		}
-		return query, errors.New(fmt.Sprintf("Unable to run model %s: %s", f.Name, err))
-	}
-
-	status, err := job.Wait(ctx)
-	if err != nil {
-		if err == context.Canceled {
-			return "", err
+		if metadata.ViewQuery != "" {
+			// We need to update the view
+			if _, err := table.Update(ctx, bigquery.TableMetadataToUpdate{
+				ViewQuery: query,
+			}, metadata.ETag); err != nil {
+				return query, fmt.Errorf("Cannot update view metadata %s: %s", f.Name, err)
+			}
+		} else {
+			// If the materialization is specified as a view, populate
+			// the BQ metadata that converts the table to a view.
+			if err := table.Create(ctx, &bigquery.TableMetadata{
+				ViewQuery: query,
+			}); err != nil {
+				return query, fmt.Errorf("Unable to create view: %s %s", f.Name, err)
+			}
 		}
-		return query, errors.New(fmt.Sprintf("Error executing model %s: %s", f.Name, err))
-	}
+	} else {
+		q := client.Query(query)
+		q.Location = target.Location
 
-	if status.State != bigquery.Done {
-		if err == context.Canceled {
-			return "", err
-		}
-		return query, errors.New(fmt.Sprintf("Model %s's execution job %s in state %d", f.Name, job.ID(), status.State))
-	}
+		// Default read information
+		q.DefaultProjectID = target.ProjectID
+		q.DefaultDatasetID = target.DataSet
+		q.DisableQueryCache = true
 
-	if err := status.Err(); err != nil {
-		if err == context.Canceled {
-			return "", err
+		// Output write information
+		q.Dst = dataset.Table(f.Name)
+		q.CreateDisposition = bigquery.CreateIfNeeded
+		q.WriteDisposition = bigquery.WriteTruncate
+
+		job, err := q.Run(ctx)
+		if err != nil {
+			if err == context.Canceled {
+				return "", err
+			}
+			return query, errors.New(fmt.Sprintf("Unable to run model %s: %s", f.Name, err))
 		}
-		return query, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", f.Name, err))
+
+		status, err := job.Wait(ctx)
+		if err != nil {
+			if err == context.Canceled {
+				return "", err
+			}
+			return query, errors.New(fmt.Sprintf("Error executing model %s: %s", f.Name, err))
+		}
+
+		if status.State != bigquery.Done {
+			if err == context.Canceled {
+				return "", err
+			}
+			return query, errors.New(fmt.Sprintf("Model %s's execution job %s in state %d", f.Name, job.ID(), status.State))
+		}
+
+		if err := status.Err(); err != nil {
+			if err == context.Canceled {
+				return "", err
+			}
+			return query, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", f.Name, err))
+		}
 	}
 
 	return query, nil
