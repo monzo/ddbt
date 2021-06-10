@@ -49,6 +49,8 @@ type File struct {
 	//ctesMutex     sync.Mutex
 	EphemeralCTES map[string]*File
 	isInDAG       bool
+
+	IsView bool // true if the model should be materialised as a view and not a table
 }
 
 func newFile(path string, fileType FileType) *File {
@@ -156,6 +158,9 @@ func (f *File) ConfigObject() *compilerInterface.Value {
 		if materialized := f.GetConfig("materialized"); materialized.Type() == compilerInterface.StringVal && materialized.StringValue != "" {
 			f.cfgMutex.Lock()
 			f.FolderConfig.Materialized = materialized.StringValue
+			if materialized.StringValue == "view" {
+				f.IsView = true
+			}
 			f.cfgMutex.Unlock()
 		}
 
