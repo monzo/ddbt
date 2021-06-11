@@ -18,13 +18,13 @@ import (
 
 var ModelFilters []string
 var FailOnNotFound bool
-
-const EnableSchemaBasedTests = false
+var EnableSchemaBasedTests bool
 
 func init() {
 	rootCmd.AddCommand(runCmd)
 	addModelsFlag(runCmd)
 	addFailOnNotFoundFlag(runCmd)
+	addEnableSchemaBasedTestsFlag(runCmd)
 }
 
 var runCmd = &cobra.Command{
@@ -54,6 +54,10 @@ func addModelsFlag(cmd *cobra.Command) {
 
 func addFailOnNotFoundFlag(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&FailOnNotFound, "fail-on-not-found", "f", true, "Fail if given models are not found")
+}
+
+func addEnableSchemaBasedTestsFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&EnableSchemaBasedTests, "enable-schema-based-tests", "f", false, "Enable Schema-based tests")
 }
 
 func readFileSystem() *fs.FileSystem {
