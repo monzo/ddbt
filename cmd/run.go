@@ -57,7 +57,7 @@ func addFailOnNotFoundFlag(cmd *cobra.Command) {
 }
 
 func addEnableSchemaBasedTestsFlag(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&EnableSchemaBasedTests, "enable-schema-based-tests", "f", false, "Enable Schema-based tests")
+	cmd.Flags().BoolVarP(&EnableSchemaBasedTests, "enable-schema-based-tests", "s", false, "Enable Schema-based tests")
 }
 
 func readFileSystem() *fs.FileSystem {
