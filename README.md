@@ -49,6 +49,7 @@ ddbt version 0.2.1
 - `--target=x` _or_ `-t x`: force DDBT to run against the `x` output defined in your `profile.yml` instead of the default defined in that file.
 - `--upstream=y` _or_ `-u y`: For any references to models outside the explicit models specified by run or test, the upstream target used to read that data will be swapped to `y` instead of the output target of `x`  
 - `--fail-on-not-found=false` _or_ `-f=false`: By default, ddbt will fail if a the specified models don't exist, passing in this argument as false will warn instead of failing  
+- `--enable-schema-based-tests` _or_ `-s=true`: Schema-based tests are disabled by default for now, but as a way to enable them pass this argument as true 
 
 ### Model Filters
 When running or testing the project, you may only want to run for a subset of your models.
