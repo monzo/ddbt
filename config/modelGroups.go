@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/user"
 
 	"gopkg.in/yaml.v2"
@@ -91,8 +92,14 @@ func updateTargetFromModelGroupConfig(target *Target, targetName string, targetC
 				if err != nil {
 					return err
 				}
-
-				target.DataSet = fmt.Sprintf("dbt_%s_%s", u.Username, targetName)
+				overrideUserDataset := os.Getenv("OVERRIDE_USER_DATASET")
+				var username string
+				if overrideUserDataset != "" {
+					username = overrideUserDataset
+				} else {
+					username = u.Username
+				}
+				target.DataSet = fmt.Sprintf("dbt_%s_%s", username, targetName)
 			} else {
 				return errors.New("expected dataset to be string or { 'from_env': true }")
 			}
