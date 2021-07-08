@@ -92,7 +92,7 @@ func updateTargetFromModelGroupConfig(target *Target, targetName string, targetC
 				if err != nil {
 					return err
 				}
-				overrideUserDataset := os.Getenv("OVERRIDE_USER_DATASET")
+				overrideUserDataset := os.Getenv("OVERRIDE_DATASET_NAME")
 				if overrideUserDataset != "" {
 					target.DataSet = fmt.Sprintf(overrideUserDataset)
 				} else {
