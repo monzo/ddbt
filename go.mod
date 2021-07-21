@@ -1,6 +1,6 @@
 module ddbt
 
-go 1.14
+go 1.16
 
 require (
 	cloud.google.com/go/bigquery v1.10.0
