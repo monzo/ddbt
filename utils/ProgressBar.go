@@ -288,7 +288,7 @@ func (sr *StatusRow) String(termWidth int) string {
 	builder.WriteString("\n   ↳ ")
 
 	if !sr.isIdle {
-		duration := time.Now().Sub(sr.changed)
+		duration := time.Since(sr.changed)
 		builder.WriteString(fmt.Sprintf(
 			"[%02.0f:%02d]",
 			math.Floor(duration.Minutes()),
