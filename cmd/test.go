@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -92,9 +91,9 @@ func executeTests(tests []*fs.File, globalContext *compiler.GlobalContext, graph
 
 					if err == nil {
 						if len(results) != 1 {
-							err = errors.New(fmt.Sprintf("a schema test should only return 1 row, got %d", len(results)))
+							err = fmt.Errorf("a schema test should only return 1 row, got %d", len(results))
 						} else if len(results[0]) != 1 {
-							err = errors.New(fmt.Sprintf("a schema test should only return 1 column, got %d", len(results[0])))
+							err = fmt.Errorf("a schema test should only return 1 column, got %d", len(results[0]))
 						} else {
 							rows, err = bigquery.ValueAsUint64(results[0][0])
 						}

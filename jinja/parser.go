@@ -1,7 +1,6 @@
 package jinja
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -86,9 +85,7 @@ func (p *parser) peekIs(tokenType lexer.TokenType) bool {
 
 // Creates a parse error with the location information
 func (p *parser) errorAt(atToken *lexer.Token, error string) error {
-	return errors.New(
-		fmt.Sprintf("%s at %s:%d:%d", error, atToken.Start.File, atToken.Start.Row, atToken.Start.Column),
-	)
+	return fmt.Errorf("%s at %s:%d:%d", error, atToken.Start.File, atToken.Start.Row, atToken.Start.Column)
 }
 
 // Creates a parse error with what we expected and what we got

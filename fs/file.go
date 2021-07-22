@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -285,7 +284,7 @@ func (f *File) GetTarget() (*config.Target, error) {
 	case compilerInterface.ListVal:
 		for _, tagValue := range value.ListValue {
 			if tagValue.Type() != compilerInterface.StringVal {
-				return nil, errors.New(fmt.Sprintf("model %s has a tag which is not a string in the 'name=value' format: %s", f.Name, tagValue))
+				return nil, fmt.Errorf("model %s has a tag which is not a string in the 'name=value' format: %s", f.Name, tagValue)
 			}
 
 			if subs, found := target.ProjectSubstitutions[tagValue.StringValue]; found {

@@ -235,7 +235,7 @@ func (v *Value) AsNumberValue() (float64, error) {
 		return v.ReturnValue.AsNumberValue()
 
 	default:
-		return 0, errors.New(fmt.Sprintf("unable to convert %s to number", v.Type()))
+		return 0, fmt.Errorf("unable to convert %s to number", v.Type())
 	}
 }
 
@@ -337,7 +337,7 @@ func ValueFromToken(t *lexer.Token) (*Value, error) {
 		return nil, errors.New("unable to convert ident to value: " + t.Value)
 
 	default:
-		return nil, errors.New(fmt.Sprintf("unable to convert %s to value", t.Type))
+		return nil, fmt.Errorf("unable to convert %s to value", t.Type)
 	}
 }
 
@@ -361,6 +361,6 @@ func NewValueFromInterface(value interface{}) (*Value, error) {
 		return NewBoolean(v), nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown value type %v", reflect.TypeOf(value)))
+		return nil, fmt.Errorf("Unknown value type %v", reflect.TypeOf(value))
 	}
 }

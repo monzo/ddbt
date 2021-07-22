@@ -375,7 +375,7 @@ func (fs *FileSystem) AddTestWithContents(testName string, content string, isSch
 	defer fs.testMutex.Unlock()
 
 	if _, found := fs.tests[testName]; found {
-		return nil, errors.New(fmt.Sprintf("test %s already exists", testName))
+		return nil, fmt.Errorf("test %s already exists", testName)
 	}
 
 	file := newFile(fmt.Sprintf("§VIRTUAL§/%s.sql", testName), TestFile)

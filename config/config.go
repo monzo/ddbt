@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -59,7 +58,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 
 	for _, target := range appConfig.ProtectedTargets {
 		if strings.ToLower(target) == strings.ToLower(targetProfile) {
-			return nil, errors.New(fmt.Sprintf("`%s` is a protected target, DDBT will not run against it.", target))
+			return nil, fmt.Errorf("`%s` is a protected target, DDBT will not run against it.", target)
 		}
 	}
 
@@ -74,7 +73,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 
 	output, found := profile.Outputs[targetProfile]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("Output `%s` of profile `%s` not found", targetProfile, project.Profile))
+		return nil, fmt.Errorf("Output `%s` of profile `%s` not found", targetProfile, project.Profile)
 	}
 
 	if threads <= 0 {
@@ -98,7 +97,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 	if upstreamProfile != "" {
 		output, found := profile.Outputs[upstreamProfile]
 		if !found {
-			return nil, errors.New(fmt.Sprintf("Output `%s` of profile `%s` not found", upstreamProfile, project.Profile))
+			return nil, fmt.Errorf("Output `%s` of profile `%s` not found", upstreamProfile, project.Profile)
 		}
 
 		GlobalCfg.Target.ReadUpstream = &Target{
@@ -128,7 +127,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 			return nil, err
 		}
 	} else {
-		return nil, errors.New(fmt.Sprintf("no models config found, expected to find `models: %s:` in `dbt_project.yml`", project.Name))
+		return nil, fmt.Errorf("no models config found, expected to find `models: %s:` in `dbt_project.yml`", project.Name)
 	}
 
 	if seedCfg, found := project.Seeds[project.Name]; found {
@@ -196,7 +195,7 @@ func readProfile(profileName string) (dbtProfile, error) {
 
 	p, found := m[profileName]
 	if !found {
-		return dbtProfile{}, errors.New(fmt.Sprintf("dbtProfile `%s` was not found in `profiles.yml`", profileName))
+		return dbtProfile{}, fmt.Errorf("dbtProfile `%s` was not found in `profiles.yml`", profileName)
 	}
 
 	return p, nil

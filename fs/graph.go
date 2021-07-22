@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -74,7 +73,7 @@ func (g *Graph) AddAllModels(fs *FileSystem) error {
 		node := g.getNodeFor(file)
 
 		if node.upstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular upstream dependency on itself", node.file.Name))
+			return fmt.Errorf("%s has a circular upstream dependency on itself", node.file.Name)
 		}
 	}
 
@@ -117,7 +116,7 @@ func (g *Graph) AddFilesWithTag(fs *FileSystem, tag string) error {
 		node := g.getNodeFor(file)
 
 		if node.upstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+			return fmt.Errorf("%s has a circular dependency on itself", node.file.Name)
 		}
 	}
 
@@ -135,7 +134,7 @@ func (g *Graph) AddNodeAndUpstreams(file *File) error {
 		node := g.getNodeFor(file)
 
 		if node.upstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+			return fmt.Errorf("%s has a circular dependency on itself", node.file.Name)
 		}
 	}
 
@@ -153,7 +152,7 @@ func (g *Graph) AddNodeAndDownstreams(file *File) error {
 		node := g.getNodeFor(file)
 
 		if node.downstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+			return fmt.Errorf("%s has a circular dependency on itself", node.file.Name)
 		}
 	}
 
@@ -210,7 +209,7 @@ func (g *Graph) AddAllUsedMacros() error {
 		node := g.getNodeFor(file)
 
 		if node.upstreamContains(node) {
-			return errors.New(fmt.Sprintf("%s has a circular dependency on itself", node.file.Name))
+			return fmt.Errorf("%s has a circular dependency on itself", node.file.Name)
 		}
 	}
 

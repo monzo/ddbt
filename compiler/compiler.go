@@ -53,7 +53,7 @@ func CompileModel(file *fs.File, gc *GlobalContext, isExecuting bool) error {
 	ec.SetVariable("execute", compilerInterface.NewBoolean(isExecuting))
 
 	if file.SyntaxTree == nil {
-		return errors.New(fmt.Sprintf("file %s has not been parsed before we attempt the compile", file.Name))
+		return fmt.Errorf("file %s has not been parsed before we attempt the compile", file.Name)
 	}
 
 	finalAST, err := file.SyntaxTree.Execute(ec)

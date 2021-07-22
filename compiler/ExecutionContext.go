@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -62,10 +61,10 @@ func (e *ExecutionContext) RegisterMacro(name string, ec compilerInterface.Execu
 
 func (e *ExecutionContext) ErrorAt(part compilerInterface.AST, error string) error {
 	if part == nil {
-		return errors.New(fmt.Sprintf("%s @ unknown", error))
+		return fmt.Errorf("%s @ unknown", error)
 	} else {
 		pos := part.Position()
-		return errors.New(fmt.Sprintf("%s @ %s:%d:%d", error, pos.File, pos.Row, pos.Column))
+		return fmt.Errorf("%s @ %s:%d:%d", error, pos.File, pos.Row, pos.Column)
 	}
 }
 
@@ -104,11 +103,11 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 		}
 
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown file type: %s", fileType))
+		return nil, fmt.Errorf("unknown file type: %s", fileType)
 	}
 
 	if upstream == nil {
-		return nil, errors.New(fmt.Sprintf("Unable to find model `%s`", modelName))
+		return nil, fmt.Errorf("Unable to find model `%s`", modelName)
 	}
 
 	e.file.RecordDependencyOn(upstream)
@@ -121,7 +120,7 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 	switch upstream.GetMaterialization() {
 	case "table", "incremental", "project_sharded_table", "view":
 		//ToDo: views are being treated as tables until they are properly implemented
-		
+
 		// If "--upstream=target" has been provided and this model is not in the DAG, then we read from the upstream
 		// target, rather than the target defined in "--target=target"
 		if target.ReadUpstream != nil && !upstream.IsInDAG() {
@@ -149,7 +148,7 @@ func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType 
 		return compilerInterface.NewString(cteName), nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown materialized config '%s' in model '%s'", upstream.GetMaterialization(), upstream.Name))
+		return nil, fmt.Errorf("unknown materialized config '%s' in model '%s'", upstream.GetMaterialization(), upstream.Name)
 	}
 }
 

@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -158,7 +157,7 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 
 			// If it's still not found, then the macro is not registering it self with it's filename
 			if !found {
-				return nil, errors.New(fmt.Sprintf("The macro file %s is not registering a macro with the same name!", name))
+				return nil, fmt.Errorf("The macro file %s is not registering a macro with the same name!", name)
 			}
 		} else {
 			// No macro exists for this
