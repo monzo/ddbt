@@ -300,7 +300,7 @@ func userPromptDocs(graph *fs.Graph, docSugsMap map[string][]string) error {
 		fmt.Scanln(&userPrompt)
 
 		if userPrompt == "y" {
-			for file, _ := range graph.ListNodes() {
+			for file := range graph.ListNodes() {
 				if _, contains := docSugsMap[file.Name]; contains {
 					ymlPath, schemaFile := generateEmptySchemaFile(file)
 					schemaModel := file.Schema

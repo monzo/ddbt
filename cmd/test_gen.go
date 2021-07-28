@@ -299,7 +299,7 @@ func userPromptTests(graph *fs.Graph, testSugsMap map[string]map[string][]string
 		fmt.Scanln(&userPrompt)
 
 		if userPrompt == "y" {
-			for file, _ := range graph.ListNodes() {
+			for file := range graph.ListNodes() {
 				if _, contains := testSugsMap[file.Name]; contains {
 					ymlPath, schemaFile := generateEmptySchemaFile(file)
 					schemaModel := file.Schema
