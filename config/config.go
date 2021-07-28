@@ -57,7 +57,7 @@ func Read(targetProfile string, upstreamProfile string, threads int, strExecutor
 	}
 
 	for _, target := range appConfig.ProtectedTargets {
-		if strings.ToLower(target) == strings.ToLower(targetProfile) {
+		if strings.EqualFold(target, targetProfile) {
 			return nil, fmt.Errorf("`%s` is a protected target, DDBT will not run against it.", target)
 		}
 	}
