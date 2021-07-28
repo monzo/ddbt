@@ -93,11 +93,11 @@ func (p *parser) expectedError(expected lexer.TokenType, got *lexer.Token) error
 	return p.errorAt(got, fmt.Sprintf("expected %s got %s", expected, got.Type))
 }
 
-func (p *parser) notImplemented() (ast.AST, error) {
+func (p *parser) notImplemented() (ast.AST, error) { //nolint:golint,unused
 	return nil, p.errorAt(p.tokens[p.nextTokenIndex-1], "not implemented")
 }
 
-func (p *parser) consumeIfPossible(tokenType lexer.TokenType) {
+func (p *parser) consumeIfPossible(tokenType lexer.TokenType) { //nolint:golint,unused
 	if p.peekIs(tokenType) {
 		p.next()
 	}

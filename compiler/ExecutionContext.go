@@ -15,7 +15,7 @@ type ExecutionContext struct {
 	fileSystem     *fs.FileSystem
 	varaiblesMutex sync.RWMutex
 	variables      map[string]*compilerInterface.Value
-	states         []map[string]*compilerInterface.Value
+	states         []map[string]*compilerInterface.Value //nolint:golint,unused,structcheck
 	isExecuting    bool
 
 	globalContext *GlobalContext

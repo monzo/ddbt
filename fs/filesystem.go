@@ -103,7 +103,7 @@ func InMemoryFileSystem(models map[string]string) (*FileSystem, error) {
 }
 
 // Scan any macros in our dbt modules folder
-func (fs *FileSystem) scanDBTModuleMacros() error {
+func (fs *FileSystem) scanDBTModuleMacros() error { //nolint:golint,unused
 	files, err := ioutil.ReadDir("./dbt_modules")
 	if err != nil {
 		if os.IsNotExist(err) {
