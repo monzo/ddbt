@@ -218,11 +218,7 @@ func runQueriesParallel(ctx context.Context, target *config.Target, allTestQueri
 
 	passedTestQueries := make(map[string][]string)
 	for passedTestQuery := range out {
-		if _, contains := passedTestQueries[passedTestQuery.Column]; contains {
-			passedTestQueries[passedTestQuery.Column] = append(passedTestQueries[passedTestQuery.Column], passedTestQuery.TestName)
-		} else {
-			passedTestQueries[passedTestQuery.Column] = []string{passedTestQuery.TestName}
-		}
+		passedTestQueries[passedTestQuery.Column] = append(passedTestQueries[passedTestQuery.Column], passedTestQuery.TestName)
 	}
 
 	return passedTestQueries, nil
