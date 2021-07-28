@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -46,31 +47,35 @@ $ ddbt completion zsh > "${fpath[1]}/_ddbt"
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 	Args:                  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
 		switch args[0] {
 		case "bash":
 			if file != "" {
-				cmd.Root().GenBashCompletionFile(file)
+				err = cmd.Root().GenBashCompletionFile(file)
 			} else {
-				cmd.Root().GenBashCompletion(os.Stdout)
+				err = cmd.Root().GenBashCompletion(os.Stdout)
 			}
 		case "zsh":
 			if file != "" {
-				cmd.Root().GenZshCompletionFile(file)
+				err = cmd.Root().GenZshCompletionFile(file)
 			} else {
-				cmd.Root().GenZshCompletion(os.Stdout)
+				err = cmd.Root().GenZshCompletion(os.Stdout)
 			}
 		case "fish":
 			if file != "" {
-				cmd.Root().GenFishCompletionFile(file, true)
+				err = cmd.Root().GenFishCompletionFile(file, true)
 			} else {
-				cmd.Root().GenFishCompletion(os.Stdout, true)
+				err = cmd.Root().GenFishCompletion(os.Stdout, true)
 			}
 		case "powershell":
 			if file != "" {
-				cmd.Root().GenPowerShellCompletionFile(file)
+				err = cmd.Root().GenPowerShellCompletionFile(file)
 			} else {
-				cmd.Root().GenPowerShellCompletion(os.Stdout)
+				err = cmd.Root().GenPowerShellCompletion(os.Stdout)
 			}
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Unable to generate shell completion for %s: %s\n", args[0], err)
 		}
 	},
 }
