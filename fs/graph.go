@@ -474,7 +474,7 @@ func (g *Graph) UnmarkFileAsRun(file *File) {
 func (g *Graph) NumberNodesNeedRerunning() int {
 	count := 0
 	for _, node := range g.nodes {
-		if node.hasRun == false {
+		if !node.hasRun {
 			count++
 		}
 	}
