@@ -299,8 +299,7 @@ func buildGraph(fileSystem *fs.FileSystem, modelFilters []string) *fs.Graph {
 	pb.Increment()
 
 	if graph.Len() == 0 {
-		fmt.Printf("❌ Empty DAG generated for model filter: %s\n", strings.Join(modelFilters, ", "))
-		os.Exit(1)
+		fmt.Printf("⚠️ Empty DAG generated for model filter: %s\n", strings.Join(modelFilters, ", "))
 	}
 
 	return graph
