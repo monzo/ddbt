@@ -122,7 +122,7 @@ func parseFiles(fileSystem *fs.FileSystem) {
 }
 
 func parseSchemas(fileSystem *fs.FileSystem) {
-	pb := utils.NewProgressBar("🗃 Reading Schemas", fileSystem.NumberSchemas())
+	pb := utils.NewProgressBar("🤓 Reading Schemas", fileSystem.NumberSchemas())
 	defer pb.Stop()
 
 	_ = fs.ProcessSchemas(
