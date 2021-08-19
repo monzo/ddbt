@@ -124,7 +124,7 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 			if err == context.Canceled {
 				return "", err
 			}
-			return query, errors.New(fmt.Sprintf("Unable to run model %s: %s", f.Name, err))
+			return query, fmt.Errorf("Unable to run model %s: %s", f.Name, err)
 		}
 
 		status, err := job.Wait(ctx)
@@ -132,21 +132,21 @@ func Run(ctx context.Context, f *fs.File) (string, error) {
 			if err == context.Canceled {
 				return "", err
 			}
-			return query, errors.New(fmt.Sprintf("Error executing model %s: %s", f.Name, err))
+			return query, fmt.Errorf("Error executing model %s: %s", f.Name, err)
 		}
 
 		if status.State != bigquery.Done {
 			if err == context.Canceled {
 				return "", err
 			}
-			return query, errors.New(fmt.Sprintf("Model %s's execution job %s in state %d", f.Name, job.ID(), status.State))
+			return query, fmt.Errorf("Model %s's execution job %s in state %d", f.Name, job.ID(), status.State)
 		}
 
 		if err := status.Err(); err != nil {
 			if err == context.Canceled {
 				return "", err
 			}
-			return query, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", f.Name, err))
+			return query, fmt.Errorf("Model %s's job result in an error: %s", f.Name, err)
 		}
 	}
 
@@ -188,7 +188,7 @@ func ValueAsUint64(value Value) (uint64, error) {
 	case float64:
 		return uint64(v), nil
 	default:
-		return 0, errors.New(fmt.Sprintf("unable to convert %v into a uint64", reflect.TypeOf(value)))
+		return 0, fmt.Errorf("unable to convert %v into a uint64", reflect.TypeOf(value))
 	}
 }
 
@@ -233,25 +233,25 @@ func NumberRows(query string, target *config.Target) (uint64, error) {
 
 	job, err := q.Run(ctx)
 	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Unable to run query: %s", err))
+		return 0, fmt.Errorf("Unable to run query: %s", err)
 	}
 
 	status, err := job.Wait(ctx)
 	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Error executing: %s", err))
+		return 0, fmt.Errorf("Error executing: %s", err)
 	}
 
 	if status.State != bigquery.Done {
-		return 0, errors.New(fmt.Sprintf("Execution job %s in state %d", job.ID(), status.State))
+		return 0, fmt.Errorf("Execution job %s in state %d", job.ID(), status.State)
 	}
 
 	if err := status.Err(); err != nil {
-		return 0, errors.New(fmt.Sprintf("Job result in an error: %s", err))
+		return 0, fmt.Errorf("Job result in an error: %s", err)
 	}
 
 	itr, err := job.Read(ctx)
 	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Job result in an error: %s", err))
+		return 0, fmt.Errorf("Job result in an error: %s", err)
 	}
 
 	return itr.TotalRows, nil
@@ -279,25 +279,25 @@ func GetRows(ctx context.Context, query string, target *config.Target) ([][]Valu
 
 	job, err := q.Run(ctx)
 	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Unable to run query %s\n\n%s", query, err))
+		return nil, nil, fmt.Errorf("Unable to run query %s\n\n%s", query, err)
 	}
 
 	status, err := job.Wait(ctx)
 	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Error executing query %s\n\n%s", query, err))
+		return nil, nil, fmt.Errorf("Error executing query %s\n\n%s", query, err)
 	}
 
 	if status.State != bigquery.Done {
-		return nil, nil, errors.New(fmt.Sprintf("Model %s's execution job %s in state %d", query, job.ID(), status.State))
+		return nil, nil, fmt.Errorf("Model %s's execution job %s in state %d", query, job.ID(), status.State)
 	}
 
 	if err := status.Err(); err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", query, err))
+		return nil, nil, fmt.Errorf("Model %s's job result in an error: %s", query, err)
 	}
 
 	itr, err := job.Read(ctx)
 	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Model %s's job result in an error: %s", query, err))
+		return nil, nil, fmt.Errorf("Model %s's job result in an error: %s", query, err)
 	}
 
 	rows := make([][]Value, 0)

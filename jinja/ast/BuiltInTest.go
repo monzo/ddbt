@@ -209,7 +209,7 @@ var BuiltInTests = map[string]func(v, arg *compilerInterface.Value) (bool, error
 			return found, nil
 
 		default:
-			return false, errors.New(fmt.Sprintf("Unable to perform the `in` operation on a %s", haystack.Type()))
+			return false, fmt.Errorf("Unable to perform the `in` operation on a %s", haystack.Type())
 		}
 	},
 	"integer": func(v, arg *compilerInterface.Value) (bool, error) {

@@ -117,9 +117,7 @@ func (w *Watcher) handleCreateEvent(path string) {
 func (w *Watcher) handleDeleteEvent(path string) {
 	// If it's a directory we're watching, stop watching it
 	w.mutex.Lock()
-	if _, found := w.directories[path]; found {
-		delete(w.directories, path)
-	}
+	delete(w.directories, path)
 	w.mutex.Unlock()
 
 	w.recordEventInBatch(path, DELETED, nil)

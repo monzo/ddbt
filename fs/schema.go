@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -54,7 +53,7 @@ func (s *SchemaFile) Parse(fs *FileSystem) error {
 		}
 
 		if model == nil {
-			return errors.New(fmt.Sprintf("Unable to apply model schema; model %s not found", modelSchema.Name))
+			return fmt.Errorf("Unable to apply model schema; model %s not found", modelSchema.Name)
 		}
 
 		model.Schema = modelSchema
@@ -64,7 +63,7 @@ func (s *SchemaFile) Parse(fs *FileSystem) error {
 	for _, modelSchema := range s.Properties.Snapshots {
 		model := fs.Model(modelSchema.Name)
 		if model == nil {
-			return errors.New(fmt.Sprintf("Unable to apply snapshot schema; %s not found", modelSchema.Name))
+			return fmt.Errorf("Unable to apply snapshot schema; %s not found", modelSchema.Name)
 		}
 
 		model.Schema = modelSchema

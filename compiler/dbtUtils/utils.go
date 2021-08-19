@@ -2,7 +2,6 @@ package dbtUtils
 
 import (
 	"ddbt/compilerInterface"
-	"errors"
 	"fmt"
 )
 
@@ -44,7 +43,7 @@ func getArgs(arguments compilerInterface.Arguments, params ...compilerInterface.
 				args[i] = compilerInterface.NewUndefined()
 			}
 		} else if !stillOrdered {
-			return nil, errors.New(fmt.Sprintf("Named arguments have been used out of order, please either used all named arguments or keep them in order. Unable to identify what %s should be.", param.Name))
+			return nil, fmt.Errorf("Named arguments have been used out of order, please either used all named arguments or keep them in order. Unable to identify what %s should be.", param.Name)
 		} else {
 			args[i] = arguments[i].Value
 		}
@@ -55,7 +54,7 @@ func getArgs(arguments compilerInterface.Arguments, params ...compilerInterface.
 		// Check types
 		if param.Value != nil && !args[i].IsUndefined {
 			if param.Value.Type() != args[i].Type() {
-				return nil, errors.New(fmt.Sprintf("Paramter %s should be a %s got a %s", param.Name, param.Value.Type(), args[i].Type()))
+				return nil, fmt.Errorf("Paramter %s should be a %s got a %s", param.Name, param.Value.Type(), args[i].Type())
 			}
 		}
 	}

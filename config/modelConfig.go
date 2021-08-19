@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -97,7 +96,7 @@ func readSubFolder(folderName string, config ModelConfig, m map[string]interface
 				for k, v := range v {
 					kStr, ok := k.(string)
 					if !ok {
-						return errors.New(fmt.Sprintf("unable to convert key `%v` into a string", key))
+						return fmt.Errorf("unable to convert key `%v` into a string", key)
 					}
 
 					strMap[kStr] = v
@@ -105,7 +104,7 @@ func readSubFolder(folderName string, config ModelConfig, m map[string]interface
 
 				subFolders[key] = strMap
 			} else {
-				return errors.New(fmt.Sprintf("unable to convert `%s` into a map, got; %v", key, reflect.TypeOf(value)))
+				return fmt.Errorf("unable to convert `%s` into a map, got; %v", key, reflect.TypeOf(value))
 			}
 		}
 	}
@@ -144,14 +143,14 @@ func strOrList(name string, value interface{}, strExecutor func(s string) (strin
 		return list, nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Unable to convert into a list of strings for `%s`, got %v", name, reflect.TypeOf(value)))
+		return nil, fmt.Errorf("Unable to convert into a list of strings for `%s`, got %v", name, reflect.TypeOf(value))
 	}
 }
 
 func asStr(name string, value interface{}, strExecutor func(s string) (string, error)) (string, error) {
 	strValue, ok := value.(string)
 	if !ok {
-		return "", errors.New(fmt.Sprintf("Unable to convert `%s` to string, got: %v", name, reflect.TypeOf(value)))
+		return "", fmt.Errorf("Unable to convert `%s` to string, got: %v", name, reflect.TypeOf(value))
 	}
 
 	strValue, err := strExecutor(strValue)

@@ -2,7 +2,6 @@ package properties
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -56,7 +55,7 @@ func (o *Test) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 
 	// Otherwise we expect a map with a single key - the test name
 	if len(m) != 1 {
-		return errors.New(fmt.Sprintf("expected 1 key for test, got %d", len(m)))
+		return fmt.Errorf("expected 1 key for test, got %d", len(m))
 	}
 
 	// Now read the arguments out in the order they are present
@@ -71,12 +70,12 @@ func (o *Test) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 				switch v := property.Value.(type) {
 				case string:
 					if v != "warn" && v != "error" {
-						return errors.New(fmt.Sprintf("severity expected to be a `warn` or `error`, got %v", v))
+						return fmt.Errorf("severity expected to be a `warn` or `error`, got %v", v)
 					}
 
 					o.Severity = v
 				default:
-					return errors.New(fmt.Sprintf("severity expected to be a `warn` or `error`, got %v", reflect.TypeOf(v)))
+					return fmt.Errorf("severity expected to be a `warn` or `error`, got %v", reflect.TypeOf(v))
 				}
 
 			case "tags":
@@ -88,21 +87,21 @@ func (o *Test) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 						if tag, ok := tagI.(string); ok {
 							tags = append(tags, tag)
 						} else {
-							return errors.New(fmt.Sprintf("expected tag value to be a string, got %v", reflect.TypeOf(tagI)))
+							return fmt.Errorf("expected tag value to be a string, got %v", reflect.TypeOf(tagI))
 						}
 					}
 
 					o.Tags = tags
 
 				default:
-					return errors.New(fmt.Sprintf("tags expected to be an array, got %v", reflect.TypeOf(v)))
+					return fmt.Errorf("tags expected to be an array, got %v", reflect.TypeOf(v))
 				}
 
 			default:
 				// otherwise transpose the test arguments to our arguments struct
 				str, ok := property.Key.(string)
 				if !ok {
-					return errors.New(fmt.Sprintf("unable to convert property key to string: %v", property.Key))
+					return fmt.Errorf("unable to convert property key to string: %v", property.Key)
 				}
 
 				arguments = append(arguments, TestArgument{
@@ -165,14 +164,12 @@ func (o *Test) toTestJinja(tableName, columnName string) (string, error) {
 	for _, arg := range o.Arguments {
 		jsonValue, err := json.Marshal(arg.Value)
 		if err != nil {
-			return "", errors.New(
-				fmt.Sprintf(
-					"Unable to convert parameter for test %s on column %s of table %s: %s",
-					o.Name,
-					columnName,
-					tableName,
-					err.Error(),
-				),
+			return "", fmt.Errorf(
+				"Unable to convert parameter for test %s on column %s of table %s: %s",
+				o.Name,
+				columnName,
+				tableName,
+				err.Error(),
 			)
 		}
 
