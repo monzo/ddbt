@@ -2,11 +2,12 @@ package dbtUtils
 
 import (
 	"context"
-	"ddbt/bigquery"
-	"ddbt/compilerInterface"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"ddbt/bigquery"
+	"ddbt/compilerInterface"
 )
 
 // GetColumnValues is a fallback GetColumnValuesWithContext
@@ -16,11 +17,11 @@ func GetColumnValues(ec compilerInterface.ExecutionContext, caller compilerInter
 }
 
 func GetColumnValuesWithContext(ctx context.Context, ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	if isOnlyCompilingSQL(ec) {
+	if IsOnlyCompilingSQL(ec) {
 		return ec.MarkAsDynamicSQL()
 	}
 
-	args, err := getArgs(arguments, param("table"), param("column"), param("max_records"))
+	args, err := GetArgs(arguments, Param("table"), Param("column"), Param("max_records"))
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
 	}
@@ -66,17 +67,17 @@ func GetColumnValuesWithContext(ctx context.Context, ec compilerInterface.Execut
 }
 
 func Unpivot(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	if isOnlyCompilingSQL(ec) {
+	if IsOnlyCompilingSQL(ec) {
 		return ec.MarkAsDynamicSQL()
 	}
 
-	args, err := getArgs(arguments,
-		paramWithDefault("table", compilerInterface.NewString("")),
-		paramWithDefault("cast_to", compilerInterface.NewString("varchar")),
-		paramWithDefault("exclude", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
-		paramWithDefault("remove", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
-		paramWithDefault("field_name", compilerInterface.NewString("field_name")),
-		paramWithDefault("value_name", compilerInterface.NewString("value_name")),
+	args, err := GetArgs(arguments,
+		ParamWithDefault("table", compilerInterface.NewString("")),
+		ParamWithDefault("cast_to", compilerInterface.NewString("varchar")),
+		ParamWithDefault("exclude", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
+		ParamWithDefault("remove", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
+		ParamWithDefault("field_name", compilerInterface.NewString("field_name")),
+		ParamWithDefault("value_name", compilerInterface.NewString("value_name")),
 	)
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))

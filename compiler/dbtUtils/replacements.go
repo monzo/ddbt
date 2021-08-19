@@ -10,7 +10,7 @@ import (
 )
 
 func UnionAllTables(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	args, err := getArgs(arguments, param("tables"), param("column_names"))
+	args, err := GetArgs(arguments, Param("tables"), Param("column_names"))
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
 	}
@@ -45,7 +45,7 @@ func UnionAllTables(ec compilerInterface.ExecutionContext, caller compilerInterf
 }
 
 func GroupBy(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	args, err := getArgs(arguments, paramWithDefault("n", compilerInterface.NewNumber(0)))
+	args, err := GetArgs(arguments, ParamWithDefault("n", compilerInterface.NewNumber(0)))
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
 	}
@@ -68,17 +68,17 @@ func GroupBy(ec compilerInterface.ExecutionContext, caller compilerInterface.AST
 }
 
 func Pivot(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, arguments compilerInterface.Arguments) (*compilerInterface.Value, error) {
-	args, err := getArgs(arguments,
-		paramWithDefault("column", compilerInterface.NewString("")),
-		paramWithDefault("values", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
-		paramWithDefault("alias", compilerInterface.NewBoolean(true)),
-		paramWithDefault("agg", compilerInterface.NewString("sum")),
-		paramWithDefault("cmp", compilerInterface.NewString("=")),
-		paramWithDefault("prefix", compilerInterface.NewString("")),
-		paramWithDefault("suffix", compilerInterface.NewString("")),
-		param("then_value"),
-		param("else_value"),
-		paramWithDefault("quote_identifiers", compilerInterface.NewBoolean(true)),
+	args, err := GetArgs(arguments,
+		ParamWithDefault("column", compilerInterface.NewString("")),
+		ParamWithDefault("values", compilerInterface.NewList(make([]*compilerInterface.Value, 0))),
+		ParamWithDefault("alias", compilerInterface.NewBoolean(true)),
+		ParamWithDefault("agg", compilerInterface.NewString("sum")),
+		ParamWithDefault("cmp", compilerInterface.NewString("=")),
+		ParamWithDefault("prefix", compilerInterface.NewString("")),
+		ParamWithDefault("suffix", compilerInterface.NewString("")),
+		Param("then_value"),
+		Param("else_value"),
+		ParamWithDefault("quote_identifiers", compilerInterface.NewBoolean(true)),
 	)
 	if err != nil {
 		return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))

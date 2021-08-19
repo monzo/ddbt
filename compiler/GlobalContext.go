@@ -173,7 +173,11 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 		newEC := ec.PushState()
 		// Note we copy any varaibles defined within the macro's own file in to the context being executed here too
 		macro.ec.CopyVariablesInto(newEC)
+
+		// We keep the caller and execute context however as these will change from when the macro was registered to when
+		// it is called
 		newEC.SetVariable("caller", ec.GetVariable("caller"))
+		newEC.SetVariable("execute", ec.GetVariable("execute"))
 
 		return macro.function(newEC, caller, args)
 	}, nil
