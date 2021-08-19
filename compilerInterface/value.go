@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"ddbt/jinja/lexer"
 )
@@ -127,26 +128,43 @@ func (v *Value) Type() ValueType {
 	}
 }
 
-func (v *Value) Properties() map[string]*Value {
+func (v *Value) Properties(isForFunctionCall bool) map[string]*Value {
 	switch v.Type() {
 	case MapVal:
 		return v.MapValue
 
 	case ListVal:
-		return map[string]*Value{
-			"items": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) { return v, nil }),
-			"extend": NewFunction(func(_ ExecutionContext, _ AST, args Arguments) (*Value, error) {
-				for _, arg := range args[0].Value.ListValue {
-					if arg != v {
-						v.ListValue = append(v.ListValue, arg)
-					}
+		extendFunc := NewFunction(func(_ ExecutionContext, _ AST, args Arguments) (*Value, error) {
+			for _, arg := range args[0].Value.ListValue {
+				if arg != v {
+					v.ListValue = append(v.ListValue, arg)
 				}
-				return v, nil
-			}),
+			}
+			return v, nil
+		})
+
+		return map[string]*Value{
+			"items":  NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) { return v, nil }),
+			"extend": extendFunc,
+			"append": extendFunc,
 		}
 
 	case ReturnVal:
-		return v.ReturnValue.Properties()
+		return v.ReturnValue.Properties(isForFunctionCall)
+
+	case StringVal:
+		if !isForFunctionCall {
+			return nil
+		}
+
+		return map[string]*Value{
+			"upper": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) {
+				return NewString(strings.ToUpper(v.StringValue)), nil
+			}),
+			"lower": NewFunction(func(_ ExecutionContext, _ AST, _ Arguments) (*Value, error) {
+				return NewString(strings.ToUpper(v.StringValue)), nil
+			}),
+		}
 
 	default:
 		return nil

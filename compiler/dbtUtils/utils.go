@@ -1,22 +1,23 @@
 package dbtUtils
 
 import (
-	"ddbt/compilerInterface"
 	"fmt"
+
+	"ddbt/compilerInterface"
 )
 
-func param(name string) compilerInterface.Argument {
-	return paramWithDefault(name, nil)
+func Param(name string) compilerInterface.Argument {
+	return ParamWithDefault(name, nil)
 }
 
-func paramWithDefault(name string, value *compilerInterface.Value) compilerInterface.Argument {
+func ParamWithDefault(name string, value *compilerInterface.Value) compilerInterface.Argument {
 	return compilerInterface.Argument{
 		Name:  name,
 		Value: value,
 	}
 }
 
-func getArgs(arguments compilerInterface.Arguments, params ...compilerInterface.Argument) ([]*compilerInterface.Value, error) {
+func GetArgs(arguments compilerInterface.Arguments, params ...compilerInterface.Argument) ([]*compilerInterface.Value, error) {
 	args := make([]*compilerInterface.Value, len(params))
 
 	// quick lookup map
@@ -62,7 +63,7 @@ func getArgs(arguments compilerInterface.Arguments, params ...compilerInterface.
 	return args, nil
 }
 
-func isOnlyCompilingSQL(ec compilerInterface.ExecutionContext) bool {
+func IsOnlyCompilingSQL(ec compilerInterface.ExecutionContext) bool {
 	value := ec.GetVariable("execute")
 
 	if value.Type() == compilerInterface.BooleanValue {

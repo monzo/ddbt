@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"ddbt/bigquery"
+	"ddbt/compiler/dbtUtils"
 	"ddbt/compilerInterface"
 	"ddbt/fs"
 	"ddbt/utils"
@@ -163,6 +165,15 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 	},
 
 	// Jinja2 Filter functions
+	"upper": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		values, err := requiredArgs(ec, caller, args, "upper", compilerInterface.StringVal)
+		if err != nil {
+			return nil, err
+		}
+
+		return compilerInterface.NewString(strings.ToUpper(values[0].AsStringValue())), nil
+	},
+
 	"lower": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 		values, err := requiredArgs(ec, caller, args, "lower", compilerInterface.StringVal)
 		if err != nil {
@@ -226,15 +237,60 @@ var adapterFunctions = map[string]compilerInterface.FunctionDef{
 	"dispatch":                   noopMethod(),
 	"get_missing_columns":        noopMethod(),
 	"expand_target_column_types": noopMethod(),
-	"get_relation":               noopMethod(),
-	"get_columns_in_relation":    noopMethod(),
-	"create_schema":              noopMethod(),
-	"drop_schema":                noopMethod(),
-	"drop_relation":              noopMethod(),
-	"rename_relation":            noopMethod(),
-	"get_columns_in_table":       noopMethod(),
-	"already_exists":             noopMethod(),
-	"adapter_macro":              noopMethod(),
+	"get_relation": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		arguments, err := dbtUtils.GetArgs(args, dbtUtils.Param("database"), dbtUtils.Param("schema"), dbtUtils.Param("identifier"))
+		if err != nil {
+			return nil, ec.ErrorAt(caller, fmt.Sprintf("%s", err))
+		}
+
+		projectID := arguments[0].AsStringValue()
+		dataSet := arguments[1].AsStringValue()
+		table := arguments[2].AsStringValue()
+
+		return compilerInterface.NewString(
+			"`" + projectID + "`.`" + dataSet + "`.`" + table + "`",
+		), nil
+	},
+	"get_columns_in_relation": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
+		values, err := requiredArgs(ec, caller, args, "adapter.get_columns_in_relation", compilerInterface.StringVal)
+		if err != nil {
+			return nil, err
+		}
+
+		if isOnlyCompilingSQL(ec) {
+			return ec.MarkAsDynamicSQL()
+		}
+
+		returnColumns := make([]*compilerInterface.Value, 0)
+
+		target, err := ec.GetTarget()
+		if err != nil {
+			return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to get the columns in relation: %s", err.Error()))
+		}
+
+		columns, err := bigquery.GetColumnsFromTable(values[0].AsStringValue(), target)
+		if err != nil {
+			return nil, ec.ErrorAt(caller, fmt.Sprintf("Unable to get the columns in relation: %s", err.Error()))
+		}
+
+		for _, column := range columns {
+			columnMap := compilerInterface.NewMap(map[string]*compilerInterface.Value{
+				"name":      compilerInterface.NewString(column.Name),
+				"column":    compilerInterface.NewString(column.Name),
+				"data_type": compilerInterface.NewString(string(column.Type)),
+			})
+			returnColumns = append(returnColumns, columnMap)
+		}
+
+		return compilerInterface.NewList(returnColumns), nil
+	},
+	"create_schema":        noopMethod(),
+	"drop_schema":          noopMethod(),
+	"drop_relation":        noopMethod(),
+	"rename_relation":      noopMethod(),
+	"get_columns_in_table": noopMethod(),
+	"already_exists":       noopMethod(),
+	"adapter_macro":        noopMethod(),
 
 	// Note listed on their site
 	"check_schema_exists": noopMethod(),

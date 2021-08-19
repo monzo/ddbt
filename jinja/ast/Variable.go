@@ -136,7 +136,7 @@ func (v *Variable) resolvePropertyLookup(ec compilerInterface.ExecutionContext, 
 		return nil, err
 	}
 
-	data := value.Properties()
+	data := value.Properties(isForFunctionCall)
 	if data == nil {
 		return nil, ec.ErrorAt(v, fmt.Sprintf("unable reference by property key in a %s", value.Type()))
 	}
