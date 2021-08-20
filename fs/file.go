@@ -16,9 +16,9 @@ type FileType string
 
 const (
 	UnknownFile FileType = "UNKNOWN"
-	ModelFile            = "model"
-	MacroFile            = "macro"
-	TestFile             = "test"
+	ModelFile   FileType = "model"
+	MacroFile   FileType = "macro"
+	TestFile    FileType = "test"
 )
 
 type File struct {

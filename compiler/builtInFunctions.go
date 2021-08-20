@@ -324,7 +324,7 @@ func refFunction(ec compilerInterface.ExecutionContext, caller compilerInterface
 
 	modelName := values[0].AsStringValue()
 
-	return ec.RegisterUpstreamAndGetRef(modelName, fs.ModelFile)
+	return ec.RegisterUpstreamAndGetRef(modelName, string(fs.ModelFile))
 }
 
 type funcMap = map[string]compilerInterface.FunctionDef
