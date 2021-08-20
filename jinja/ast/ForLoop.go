@@ -19,7 +19,7 @@ type ForLoop struct {
 }
 
 type ForLoopParameter struct {
-	name         string
+	name         string //nolint:structcheck,unused
 	defaultValue *lexer.Token
 }
 
