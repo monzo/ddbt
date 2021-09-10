@@ -166,7 +166,7 @@ func (g *GlobalContext) GetMacro(name string) (compilerInterface.FunctionDef, er
 	}
 
 	return func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
-		if _, err := ec.RegisterUpstreamAndGetRef(macro.fileName, fs.MacroFile); err != nil {
+		if _, err := ec.RegisterUpstreamAndGetRef(macro.fileName, string(fs.MacroFile)); err != nil {
 			return nil, ec.ErrorAt(caller, err.Error())
 		}
 

@@ -12,9 +12,9 @@ type variableType = string
 
 const (
 	identVar          variableType = "IDENT"
-	propertyLookupVar              = "PROPERTY_LOOKUP"
-	indexLookupVar                 = "INDEX_LOOKUP"
-	funcCallVar                    = "FUNC_CALL"
+	propertyLookupVar variableType = "PROPERTY_LOOKUP"
+	indexLookupVar    variableType = "INDEX_LOOKUP"
+	funcCallVar       variableType = "FUNC_CALL"
 )
 
 type Variable struct {

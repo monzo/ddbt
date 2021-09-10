@@ -90,7 +90,7 @@ func (e *ExecutionContext) CopyVariablesInto(ec compilerInterface.ExecutionConte
 func (e *ExecutionContext) RegisterUpstreamAndGetRef(modelName string, fileType string) (*compilerInterface.Value, error) {
 	var upstream *fs.File
 
-	switch fileType {
+	switch fs.FileType(fileType) {
 	case fs.ModelFile:
 		upstream = e.fileSystem.Model(modelName)
 
