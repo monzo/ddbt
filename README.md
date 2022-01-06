@@ -1,6 +1,6 @@
 # Dom's Data Build Tool
 
-[![Build Status](https://travis-ci.org/monzo/ddbt.svg?branch=master)](https://travis-ci.org/monzo/ddbt)
+[![Build Status](https://github.com/monzo/ddbt/actions/workflows/tests.yml/badge.svg)](https://github.com/monzo/ddbt/actions/workflows/tests.yml)
 [![GoDoc](https://godoc.org/github.com/monzo/ddbt?status.svg)](https://godoc.org/github.com/monzo/ddbt)
 
 This repo represents my attempt to build a fast version of [DBT](https://www.getdbt.com/) which gets very slow on large 
