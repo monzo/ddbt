@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	// "ddbt/cmd"
 
 	"gopkg.in/yaml.v2"
 )
@@ -45,8 +46,8 @@ func (c *Config) GetTargetFor(path string) *Target {
 
 var GlobalCfg *Config
 
-func Read(targetProfile string, upstreamProfile string, threads int, strExecutor func(s string) (string, error)) (*Config, error) {
-	project, err := readDBTProject()
+func Read(targetProfile string, upstreamProfile string, threads int, customConfigPath string, strExecutor func(s string) (string, error)) (*Config, error) {
+	project, err := readDBTProject(customConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -154,10 +155,10 @@ type dbtProject struct {
 	Seeds   map[string]map[string]interface{} `yaml:"seeds"`  // "Seeds[project_name][key]value"
 }
 
-func readDBTProject() (dbtProject, error) {
+func readDBTProject(customConfigPath string) (dbtProject, error) {
 	project := dbtProject{}
 
-	bytes, err := ioutil.ReadFile("dbt_project.yml")
+	bytes, err := ioutil.ReadFile(customConfigPath + "dbt_project.yml")
 	if err != nil {
 		return dbtProject{}, err
 	}

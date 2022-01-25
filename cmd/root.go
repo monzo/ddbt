@@ -31,12 +31,14 @@ var (
 	targetProfile   string
 	upstreamProfile string
 	threads         int
+	customConfigPath string
 )
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&targetProfile, "target", "t", "", "Which target profile to use")
 	rootCmd.PersistentFlags().StringVarP(&upstreamProfile, "upstream", "u", "", "Which target profile to use when reading data outside the current DAG")
 	rootCmd.PersistentFlags().IntVar(&threads, "threads", 0, "How many threads to execute with")
+	rootCmd.PersistentFlags().StringVarP(&customConfigPath, "custom-config-path", "c", "", "Pass in a custom config path")
 }
 
 func Execute() {
@@ -51,7 +53,7 @@ func initDDBT() {
 	cdIntoDBTFolder()
 
 	// Read the project config
-	cfg, err := config.Read(targetProfile, upstreamProfile, threads, compiler.CompileStringWithCache)
+	cfg, err := config.Read(targetProfile, upstreamProfile, threads, customConfigPath, compiler.CompileStringWithCache)
 	if err != nil {
 		fmt.Printf("❌ Unable to load config: %s\n", err)
 		os.Exit(1)
