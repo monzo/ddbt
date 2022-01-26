@@ -45,8 +45,8 @@ func (c *Config) GetTargetFor(path string) *Target {
 
 var GlobalCfg *Config
 
-func Read(targetProfile string, upstreamProfile string, threads int, strExecutor func(s string) (string, error)) (*Config, error) {
-	project, err := readDBTProject()
+func Read(targetProfile string, upstreamProfile string, threads int, customConfigPath string, strExecutor func(s string) (string, error)) (*Config, error) {
+	project, err := readDBTProject(customConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -154,10 +154,24 @@ type dbtProject struct {
 	Seeds   map[string]map[string]interface{} `yaml:"seeds"`  // "Seeds[project_name][key]value"
 }
 
-func readDBTProject() (dbtProject, error) {
+func handleCustomConfigPath(customConfigPath string) (string, error) {
+	// if a custom path is provided, ensure that a trailing slash is present
+	if customConfigPath != "" {
+		customConfigPath = strings.TrimRight(customConfigPath, string(os.PathSeparator))
+		customConfigPath = customConfigPath + string(os.PathSeparator)
+	}
+	return customConfigPath, nil
+}
+
+func readDBTProject(customConfigPath string) (dbtProject, error) {
 	project := dbtProject{}
 
-	bytes, err := ioutil.ReadFile("dbt_project.yml")
+	customConfigPath, err := handleCustomConfigPath(customConfigPath)
+	if err != nil {
+		return dbtProject{}, err
+	}
+
+	bytes, err := ioutil.ReadFile(customConfigPath + "dbt_project.yml")
 	if err != nil {
 		return dbtProject{}, err
 	}
