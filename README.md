@@ -50,7 +50,7 @@ ddbt version 0.6.5
 - `--upstream=y` _or_ `-u y`: For any references to models outside the explicit models specified by run or test, the upstream target used to read that data will be swapped to `y` instead of the output target of `x`
 - `--fail-on-not-found=false` _or_ `-f=false`: By default, ddbt will fail if a the specified models don't exist, passing in this argument as false will warn instead of failing
 - `--enable-schema-based-tests` _or_ `-s=true`: Schema-based tests are disabled by default for now, but as a way to enable them pass this argument as true
-- `--custom-config-path=myCustomPathWithTrailingSlash/` _or_ `-c=myCustomPathWithTrailingSlash/`: Allows a custom path to be used for the `dbt_project.yml`. This is useful if you want to use a different location than the default one. For example if you're mid-way through migrating commands from an old dbt version to a new version and using two different versions of `dbt_project.yml` at the same time.
+- `--custom-config-path=my/custom/path` _or_ `-c=my/custom/path`: Allows a custom path to be used for the `dbt_project.yml`. This is useful if you want to use a different location than the default one. For example if you're mid-way through migrating commands from an old dbt version to a new version and using two different versions of `dbt_project.yml` at the same time.
 
 ### Model Filters
 When running or testing the project, you may only want to run for a subset of your models.

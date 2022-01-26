@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	// "ddbt/cmd"
 
 	"gopkg.in/yaml.v2"
 )
@@ -155,8 +154,22 @@ type dbtProject struct {
 	Seeds   map[string]map[string]interface{} `yaml:"seeds"`  // "Seeds[project_name][key]value"
 }
 
+func handleCustomConfigPath(customConfigPath string) (string, error) {
+	// if a custom path is provided, ensure that a trailing slash is present
+	if customConfigPath != "" {
+		customConfigPath = strings.TrimRight(customConfigPath, string(os.PathSeparator))
+		customConfigPath = customConfigPath + string(os.PathSeparator)
+	}
+	return customConfigPath, nil
+}
+
 func readDBTProject(customConfigPath string) (dbtProject, error) {
 	project := dbtProject{}
+
+	customConfigPath, err := handleCustomConfigPath(customConfigPath)
+	if err != nil {
+		return dbtProject{}, err
+	}
 
 	bytes, err := ioutil.ReadFile(customConfigPath + "dbt_project.yml")
 	if err != nil {
