@@ -147,6 +147,8 @@ func isolateGraph(graph *fs.Graph) {
 		"docs",
 		"dbt_modules",
 		"macros",
+		// Hack for migration where we're using two version of dbt
+		"dbt_modules_v0_21_x",
 	}
 
 	// If we have a model groups file bring that too
