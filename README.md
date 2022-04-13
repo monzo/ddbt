@@ -27,7 +27,7 @@ $ go install
 4. Confirm installation
 ```bash
 $ ddbt --version
-ddbt version 0.6.5
+ddbt version 0.6.7
 ```
 
 ## Command Quickstart

@@ -198,6 +198,9 @@ var builtInFunctions = map[string]compilerInterface.FunctionDef{
 	// Our specific functions
 	"indirect_ref": refFunction,
 
+	// Our specific functions ( without implementations in ddbt )
+	"is_marked_for_full_refresh": noopMethod(),
+
 	// DDBT Debugging function - Allows removing of macro's from models without completely removing them
 	"noop": func(ec compilerInterface.ExecutionContext, caller compilerInterface.AST, args compilerInterface.Arguments) (*compilerInterface.Value, error) {
 		return compilerInterface.NewUndefined(), nil
