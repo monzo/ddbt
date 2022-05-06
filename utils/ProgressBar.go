@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/mattn/go-isatty"
 	"io"
 	"math"
 	"os"
@@ -121,12 +122,21 @@ func (pb *ProgressBar) Start() {
 	pb.started = true
 	pb.startMutex.Unlock()
 
-	pb.ticker = time.NewTicker(refreshRate)
+	// Check if we're running in a TTY, we only want to draw if it is
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		pb.ticker = time.NewTicker(refreshRate)
 
-	// Write the initial process of the bar
-	_, _ = pb.output.Write([]byte(pb.String(pb.Width())))
-
-	go pb.tick()
+		// Write the initial process of the bar
+		_, _ = pb.output.Write([]byte(pb.String(pb.Width())))
+		go pb.tick()
+	} else {
+		// Just print the label and start a goroutine to finish ticking
+		_, _ = pb.output.Write([]byte(pb.label + "\n"))
+		go func() {
+			<-pb.finishTicking
+			pb.tickingFinished <- struct{}{}
+		}()
+	}
 }
 
 func (pb *ProgressBar) Stop() {
