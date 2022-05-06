@@ -225,5 +225,5 @@ func isolateGraph(graph *fs.Graph) {
 
 	pb.Stop()
 
-	fmt.Print(isolationDir)
+	fmt.Printf("Isolation Directory: %s\n", isolationDir)
 }
