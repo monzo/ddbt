@@ -1,3 +1,9 @@
+# This repo is now archived
+
+It's left here for historic purposes so as to preserve the code that is within it, however no active development is continuing on `ddbt`. If support/discussion around re-opening the repo want to be had, please come visit us in #data-engineering-ask.
+
+The original state of the README can be seen below.
+
 # Dom's Data Build Tool
 
 [![Build Status](https://github.com/monzo/ddbt/actions/workflows/tests.yml/badge.svg)](https://github.com/monzo/ddbt/actions/workflows/tests.yml)
